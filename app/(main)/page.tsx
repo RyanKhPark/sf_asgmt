@@ -3,7 +3,7 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 
-export default function Dashboard() {
+export default function Home() {
   const [pdfFile, setPdfFile] = useState<File | null>(null);
   const [pdfUrl, setPdfUrl] = useState("");
   const [isDragging, setIsDragging] = useState(false);
@@ -44,7 +44,7 @@ export default function Dashboard() {
     }
   };
 
-  const handleLetsChat = () => {
+  const handleSubmit = () => {
     if (pdfFile || pdfUrl) {
       // TODO: Process PDF and navigate to chat
       console.log("Processing PDF:", pdfFile || pdfUrl);
@@ -72,7 +72,7 @@ export default function Dashboard() {
               onDragLeave={handleDragLeave}
               onDrop={handleDrop}
               placeholder="Drag and drop a PDF file here &#10; Or Paste a PDF URL"
-              rows={8}
+              rows={3}
               readOnly={!!pdfFile}
               className={`w-full px-6 py-4 pb-12 border-2 border-dashed rounded-lg shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 resize-none text-center transition-colors ${
                 isDragging
@@ -114,7 +114,7 @@ export default function Dashboard() {
 
             {/* Let's Chat button in bottom right */}
             <button
-              onClick={handleLetsChat}
+              onClick={handleSubmit}
               disabled={!pdfFile && !pdfUrl}
               className={`absolute bottom-3 right-3 inline-flex items-center px-4 py-2 rounded-md text-white font-semibold transition-colors ${
                 pdfFile || pdfUrl
