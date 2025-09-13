@@ -1,12 +1,16 @@
-export default function MainLayout({
-  children,
-}: {
+import HomeSidebar from "@/components/layout/sidebar";
+
+interface Props {
   children: React.ReactNode;
-}) {
+}
+
+export default function HomeLayout({ children }: Props) {
   return (
-    <div className="flex h-screen">
-      <aside className="w-64 bg-gray-100">{/* Sidebar */}</aside>
-      <main className="flex-1">{children}</main>
+    <div className="flex h-screen w-screen">
+      <HomeSidebar />
+      <main className="flex-1 flex flex-col bg-muted overflow-hidden">
+        <div className="h-full overflow-y-auto">{children}</div>
+      </main>
     </div>
   );
 }
