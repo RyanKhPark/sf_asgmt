@@ -1,7 +1,6 @@
 @import "tailwindcss";
 
 @plugin "tailwindcss-animate";
-@import "tw-animate-css";
 
 @custom-variant dark (&:is(.dark *));
 
@@ -50,6 +49,9 @@
 }
 
 :root {
+  --sidebar-width: 16rem;
+  --sidebar-width-icon: 3rem;
+  --sidebar-transition-duration: 300ms;
   --radius: 0.625rem;
   --background: oklch(1 0 0);
   --foreground: oklch(0.145 0 0);
@@ -124,5 +126,14 @@
   }
   body {
     @apply bg-background text-foreground;
+  }
+
+  /* Override sidebar transition timing */
+  [data-sidebar="sidebar"] {
+    transition-duration: 300ms !important;
+  }
+
+  [data-sidebar="sidebar"] [data-slot="sidebar-gap"] {
+    transition-duration: 300ms !important;
   }
 }
