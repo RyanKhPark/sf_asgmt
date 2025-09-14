@@ -11,12 +11,9 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { signIn } from "next-auth/react";
-
-interface AuthModalProps {
-  isOpen: boolean;
-  onClose: () => void;
-  mode?: "signin" | "signup";
-}
+import { signUpSchema, signInSchema } from "@/lib/validations";
+import { AlertCircle } from "lucide-react";
+import type { AuthModalProps } from "@/types/auth";
 
 export function AuthModal({
   isOpen,
@@ -28,25 +25,55 @@ export function AuthModal({
   const [password, setPassword] = useState("");
   const [name, setName] = useState("");
   const [loading, setLoading] = useState(false);
+  const [errors, setErrors] = useState<Record<string, string>>({});
+  const [generalError, setGeneralError] = useState("");
+
+  const resetErrors = () => {
+    setErrors({});
+    setGeneralError("");
+  };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setLoading(true);
+    resetErrors();
 
     try {
+      // Validate input
+      const schema = authMode === "signup" ? signUpSchema : signInSchema;
+      const data =
+        authMode === "signup" ? { name, email, password } : { email, password };
+
+      const validation = schema.safeParse(data);
+
+      if (!validation.success) {
+        const fieldErrors: Record<string, string> = {};
+        validation.error.issues.forEach((error) => {
+          if (error.path[0]) {
+            fieldErrors[error.path[0] as string] = error.message;
+          }
+        });
+        setErrors(fieldErrors);
+        return;
+      }
+
       if (authMode === "signup") {
-        const response = await fetch("/api/auth/signup", {
+        const response = await fetch("/api/auth/register", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ email, password, name }),
         });
 
+        const result = await response.json();
+
         if (response.ok) {
           // Switch to signin after successful signup
           setAuthMode("signin");
           setName("");
+          setPassword("");
+          setGeneralError("");
         } else {
-          console.error("Signup failed");
+          setGeneralError(result.error || "Signup failed");
         }
       } else {
         const result = await signIn("credentials", {
@@ -57,12 +84,17 @@ export function AuthModal({
 
         if (result?.ok) {
           onClose();
+          // Reset form
+          setEmail("");
+          setPassword("");
+          setName("");
         } else {
-          console.error("Login failed");
+          setGeneralError(result?.error || "Invalid email or password");
         }
       }
     } catch (error) {
       console.error("Auth error:", error);
+      setGeneralError("An unexpected error occurred");
     } finally {
       setLoading(false);
     }
@@ -81,10 +113,18 @@ export function AuthModal({
           </DialogTitle>
         </DialogHeader>
         <div className="space-y-4">
+          {generalError && (
+            <div className="flex items-center gap-2 text-red-600 text-sm bg-red-50 p-3 rounded-md">
+              <AlertCircle className="size-4" />
+              {generalError}
+            </div>
+          )}
+
           <Button
             onClick={handleGoogleSignIn}
             className="w-full"
             variant="outline"
+            disabled={loading}
           >
             Continue with Google
           </Button>
@@ -109,8 +149,12 @@ export function AuthModal({
                   placeholder="Enter your name"
                   value={name}
                   onChange={(e) => setName(e.target.value)}
-                  required
+                  className={errors.name ? "border-red-500" : ""}
+                  disabled={loading}
                 />
+                {errors.name && (
+                  <p className="text-red-600 text-xs">{errors.name}</p>
+                )}
               </div>
             )}
 
@@ -122,8 +166,12 @@ export function AuthModal({
                 placeholder="Enter your email"
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
-                required
+                className={errors.email ? "border-red-500" : ""}
+                disabled={loading}
               />
+              {errors.email && (
+                <p className="text-red-600 text-xs">{errors.email}</p>
+              )}
             </div>
 
             <div className="space-y-2">
@@ -131,11 +179,19 @@ export function AuthModal({
               <Input
                 id="password"
                 type="password"
-                placeholder="Enter your password"
+                placeholder={
+                  authMode === "signup"
+                    ? "Create a strong password"
+                    : "Enter your password"
+                }
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
-                required
+                className={errors.password ? "border-red-500" : ""}
+                disabled={loading}
               />
+              {errors.password && (
+                <p className="text-red-600 text-xs">{errors.password}</p>
+              )}
             </div>
 
             <Button type="submit" className="w-full" disabled={loading}>
