@@ -1,4 +1,5 @@
 import HomeSidebar from "@/components/layout/sidebar";
+import { RegisterPopup } from "@/components/auth/register-popup";
 
 interface Props {
   children: React.ReactNode;
@@ -11,6 +12,7 @@ export default function HomeLayout({ children }: Props) {
       <main className="flex-1 flex flex-col bg-muted overflow-hidden">
         <div className="h-full overflow-y-auto">{children}</div>
       </main>
+      <RegisterPopup />
     </div>
   );
 }
