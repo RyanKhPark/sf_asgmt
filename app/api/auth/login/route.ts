@@ -12,8 +12,7 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // For now, we'll use next-auth's signIn function
-    // Later this will verify against database
+    // Later for database
     await signIn("credentials", {
       email,
       password,
@@ -23,9 +22,6 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ success: true });
   } catch (error) {
     console.error("Login error:", error);
-    return NextResponse.json(
-      { error: "Invalid credentials" },
-      { status: 401 }
-    );
+    return NextResponse.json({ error: "Invalid credentials" }, { status: 401 });
   }
 }

@@ -1,7 +1,12 @@
 "use client";
 
 import { useState } from "react";
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -13,7 +18,11 @@ interface AuthModalProps {
   mode?: "signin" | "signup";
 }
 
-export function AuthModal({ isOpen, onClose, mode = "signin" }: AuthModalProps) {
+export function AuthModal({
+  isOpen,
+  onClose,
+  mode = "signin",
+}: AuthModalProps) {
   const [authMode, setAuthMode] = useState(mode);
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
@@ -134,15 +143,14 @@ export function AuthModal({ isOpen, onClose, mode = "signin" }: AuthModalProps) 
                 ? "Loading..."
                 : authMode === "signin"
                 ? "Sign In"
-                : "Sign Up"
-              }
+                : "Sign Up"}
             </Button>
           </form>
 
           <div className="text-center text-sm">
             {authMode === "signin" ? (
               <>
-                Don't have an account?{" "}
+                Don&apos;t have an account?{" "}
                 <Button
                   variant="link"
                   className="p-0 h-auto"
