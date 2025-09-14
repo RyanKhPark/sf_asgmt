@@ -9,6 +9,9 @@ export default function Home() {
   const [pdfFile, setPdfFile] = useState<File | null>(null);
   const [pdfUrl, setPdfUrl] = useState("");
   const [isDragging, setIsDragging] = useState(false);
+  const [isUploading, setIsUploading] = useState(false);
+  const [uploadProgress, setUploadProgress] = useState("");
+  const [error, setError] = useState("");
   const router = useRouter();
   const { requireAuth, showAuthModal, setShowAuthModal } = useAuthGuard();
 
@@ -38,6 +41,7 @@ export default function Home() {
     if (files && files.length > 0 && files[0].type === "application/pdf") {
       setPdfFile(files[0]);
       setPdfUrl("");
+      setError(""); // Clear any previous errors
     }
   };
 
@@ -53,13 +57,66 @@ export default function Home() {
     }
   };
 
-  const handleSubmit = () => {
+  const handleSubmit = async () => {
     if (!requireAuth()) return;
 
-    if (pdfFile || pdfUrl) {
-      // TODO: Process PDF and navigate to chat
-      console.log("Processing PDF:", pdfFile || pdfUrl);
-      router.push("/pdfchat/new");
+    if (!pdfFile && !pdfUrl) return;
+
+    setIsUploading(true);
+    setError("");
+
+    try {
+      let documentId = "";
+
+      if (pdfFile) {
+        setUploadProgress("Uploading PDF...");
+
+        // Upload file
+        const formData = new FormData();
+        formData.append("file", pdfFile);
+        formData.append("filename", pdfFile.name);
+        formData.append("title", pdfFile.name.replace(/\.pdf$/i, ""));
+
+        const uploadResponse = await fetch("/api/documents/upload", {
+          method: "POST",
+          body: formData,
+        });
+
+        if (!uploadResponse.ok) {
+          const errorData = await uploadResponse.json();
+          throw new Error(errorData.error || "Upload failed");
+        }
+
+        const uploadResult = await uploadResponse.json();
+        documentId = uploadResult.document.id;
+
+        setUploadProgress("Processing PDF text...");
+
+        // Process PDF
+        const processResponse = await fetch(`/api/documents/${documentId}/process`, {
+          method: "POST",
+        });
+
+        if (!processResponse.ok) {
+          console.warn("PDF processing failed, but continuing...");
+        }
+
+        setUploadProgress("Complete! Opening chat...");
+
+      } else if (pdfUrl) {
+        setError("URL upload not implemented yet. Please upload a file instead.");
+        return;
+      }
+
+      // Navigate to chat
+      router.push(`/pdfchat/${documentId}`);
+
+    } catch (error) {
+      console.error("Error uploading PDF:", error);
+      setError(error instanceof Error ? error.message : "Failed to upload PDF");
+    } finally {
+      setIsUploading(false);
+      setUploadProgress("");
     }
   };
 
@@ -73,6 +130,18 @@ export default function Home() {
           >
             Throw in Your PDF and Chat!
           </label>
+
+          {error && (
+            <div className="mb-4 p-3 bg-red-100 border border-red-400 text-red-700 rounded">
+              {error}
+            </div>
+          )}
+
+          {uploadProgress && (
+            <div className="mb-4 p-3 bg-blue-100 border border-blue-400 text-blue-700 rounded">
+              {uploadProgress}
+            </div>
+          )}
 
           <div className="relative">
             <textarea
@@ -97,7 +166,12 @@ export default function Home() {
 
             <button
               onClick={() => document.getElementById("pdf-upload")?.click()}
-              className="absolute bottom-3 left-3 inline-flex items-center px-3 py-2 border border-gray-300 rounded-md shadow-sm bg-white text-sm font-medium text-gray-700 hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-blue-500"
+              disabled={isUploading}
+              className={`absolute bottom-3 left-3 inline-flex items-center px-3 py-2 border border-gray-300 rounded-md shadow-sm bg-white text-sm font-medium transition-colors focus:outline-none focus:ring-2 focus:ring-blue-500 ${
+                isUploading
+                  ? "text-gray-400 cursor-not-allowed"
+                  : "text-gray-700 hover:bg-gray-50"
+              }`}
             >
               <svg
                 className="w-4 h-4 mr-1"
@@ -127,14 +201,24 @@ export default function Home() {
             {/* Let's Chat button in bottom right */}
             <button
               onClick={handleSubmit}
-              disabled={!pdfFile && !pdfUrl}
+              disabled={!pdfFile && !pdfUrl || isUploading}
               className={`absolute bottom-3 right-3 inline-flex items-center px-4 py-2 rounded-md text-white font-semibold transition-colors ${
-                pdfFile || pdfUrl
+                (pdfFile || pdfUrl) && !isUploading
                   ? "bg-blue-600 hover:bg-blue-700"
                   : "bg-gray-400 cursor-not-allowed"
               }`}
             >
-              Let&apos;s Chat!
+              {isUploading ? (
+                <>
+                  <svg className="animate-spin -ml-1 mr-3 h-4 w-4 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                    <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                    <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                  </svg>
+                  Processing...
+                </>
+              ) : (
+                "Let's Chat!"
+              )}
             </button>
 
             {/* Clear button when file is selected */}
