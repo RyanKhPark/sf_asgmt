@@ -99,6 +99,7 @@ export function PDFViewer({
           </Button>
         </div>
       </div>
+
       {/* PDF Container */}
       <div ref={containerRef} className="flex-1 overflow-auto p-4 bg-gray-100">
         <div className="flex justify-center items-center min-h-full">
