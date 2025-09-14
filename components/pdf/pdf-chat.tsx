@@ -19,6 +19,8 @@ export function PDFChat({ documentId, pdfContent }: PDFChatProps) {
   const [messages, setMessages] = useState<Message[]>([]);
   const [inputValue, setInputValue] = useState("");
   const [isLoading, setIsLoading] = useState(false);
+  const [conversationId, setConversationId] = useState<string | null>(null);
+  const [isLoadingHistory, setIsLoadingHistory] = useState(true);
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
   const scrollToBottom = () => {
@@ -28,6 +30,26 @@ export function PDFChat({ documentId, pdfContent }: PDFChatProps) {
   useEffect(() => {
     scrollToBottom();
   }, [messages]);
+
+  // Load chat history on component mount
+  useEffect(() => {
+    const loadChatHistory = async () => {
+      try {
+        const response = await fetch(`/api/conversations/${documentId}`);
+        if (response.ok) {
+          const data = await response.json();
+          setConversationId(data.conversationId);
+          setMessages(data.messages || []);
+        }
+      } catch (error) {
+        console.error("Failed to load chat history:", error);
+      } finally {
+        setIsLoadingHistory(false);
+      }
+    };
+
+    loadChatHistory();
+  }, [documentId]);
 
   const handleSendMessage = async () => {
     if (!inputValue.trim() || isLoading) return;
@@ -52,6 +74,7 @@ export function PDFChat({ documentId, pdfContent }: PDFChatProps) {
           message: inputValue,
           pdfContent,
           documentId,
+          conversationId,
         }),
       });
 
@@ -100,14 +123,23 @@ export function PDFChat({ documentId, pdfContent }: PDFChatProps) {
 
       {/* Messages */}
       <div className="flex-1 overflow-y-auto p-4 space-y-4">
-        {messages.length === 0 && (
+        {isLoadingHistory ? (
+          <div className="text-center text-gray-500 py-8">
+            <div className="flex items-center justify-center space-x-2">
+              <div className="w-2 h-2 bg-gray-400 rounded-full animate-bounce [animation-delay:0ms]"></div>
+              <div className="w-2 h-2 bg-gray-400 rounded-full animate-bounce [animation-delay:150ms]"></div>
+              <div className="w-2 h-2 bg-gray-400 rounded-full animate-bounce [animation-delay:300ms]"></div>
+            </div>
+            <p className="text-sm mt-2">Loading chat history...</p>
+          </div>
+        ) : messages.length === 0 ? (
           <div className="text-center text-gray-500 py-8">
             <p className="text-lg font-medium">👋 Hi there!</p>
             <p className="text-sm mt-2">
               Ask me anything about this PDF document.
             </p>
           </div>
-        )}
+        ) : null}
 
         {messages.map((message) => (
           <div

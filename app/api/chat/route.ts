@@ -1,13 +1,20 @@
 import { NextRequest, NextResponse } from "next/server";
 import { GoogleGenAI } from "@google/genai";
+import { auth } from "@/auth";
+import { db } from "@/lib/db";
 
 export async function POST(request: NextRequest) {
   try {
-    const { message, pdfContent, documentId } = await request.json();
+    const session = await auth();
+    if (!session?.user?.id) {
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    }
 
-    if (!message) {
+    const { message, pdfContent, documentId, conversationId } = await request.json();
+
+    if (!message || !documentId) {
       return NextResponse.json(
-        { error: "Message is required" },
+        { error: "Message and documentId are required" },
         { status: 400 }
       );
     }
@@ -57,6 +64,43 @@ Please respond as a knowledgeable professor would in an academic discussion.`;
     });
 
     const text = result.text;
+
+    // Save both user message and AI response to database if conversationId provided
+    if (conversationId) {
+      try {
+        // Verify conversation belongs to user
+        const conversation = await db.conversation.findFirst({
+          where: {
+            id: conversationId,
+            userId: session.user.id,
+            documentId,
+          },
+        });
+
+        if (conversation) {
+          // Save user message
+          await db.message.create({
+            data: {
+              content: message,
+              role: "user",
+              conversationId,
+            },
+          });
+
+          // Save AI response
+          await db.message.create({
+            data: {
+              content: text || "",
+              role: "assistant",
+              conversationId,
+            },
+          });
+        }
+      } catch (dbError) {
+        console.error("Database save error:", dbError);
+        // Don't fail the request if database save fails
+      }
+    }
 
     return NextResponse.json({
       message: text,
