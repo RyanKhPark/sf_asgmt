@@ -2,7 +2,7 @@
 
 import { useState, useRef, useEffect } from "react";
 import { Button } from "@/components/ui/button";
-import { Send, Loader2 } from "lucide-react";
+import { Send } from "lucide-react";
 
 interface Message {
   id: string;
@@ -131,8 +131,13 @@ export function PDFChat({ documentId, pdfContent }: PDFChatProps) {
         {isLoading && (
           <div className="flex justify-start">
             <div className="bg-gray-100 px-4 py-2 rounded-lg flex items-center space-x-2">
-              <Loader2 className="h-4 w-4 animate-spin" />
-              <span className="text-sm text-gray-600">AI is thinking...</span>
+              <div className="flex items-center space-x-1">
+                <div className="flex space-x-1">
+                  <div className="w-1 h-1 bg-gray-500 rounded-full animate-bounce [animation-delay:0ms]"></div>
+                  <div className="w-1 h-1 bg-gray-500 rounded-full animate-bounce [animation-delay:150ms]"></div>
+                  <div className="w-1 h-1 bg-gray-500 rounded-full animate-bounce [animation-delay:300ms]"></div>
+                </div>
+              </div>
             </div>
           </div>
         )}

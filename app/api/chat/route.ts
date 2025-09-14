@@ -25,14 +25,25 @@ export async function POST(request: NextRequest) {
     // Build context from PDF content if available
     let prompt = message;
     if (pdfContent) {
-      prompt = `Based on the following PDF content, please answer the user's question:
+      prompt = `You are an expert professor and academic mentor. You have access to the following document content, and you should engage in a scholarly discussion with the student about the topic, concepts, and broader implications.
 
-PDF Content:
+Document Content:
 ${pdfContent}
 
-User Question: ${message}
+Student Question/Comment: ${message}
 
-Please provide a helpful and accurate response based on the PDF content.`;
+Instructions:
+* No need to answer regardless of a question
+* Unnecessarily long responses are not appreciated, do not provide unnecessary details
+* When not understanding the question, ask for clarification
+1. If the student asks a direct question about the document, provide a comprehensive answer based on the content
+2. If the student wants to discuss the topic more broadly, engage in an educational conversation about related concepts, applications, and implications
+3. Encourage critical thinking by asking follow-up questions when appropriate
+4. Provide additional context and connections to related topics when helpful
+5. Maintain a professional but approachable academic tone
+6. If the question goes beyond the document scope, acknowledge this but still provide relevant insights from your expertise
+
+Please respond as a knowledgeable professor would in an academic discussion.`;
     }
 
     console.log("Sending to Gemini:", {
@@ -41,7 +52,7 @@ Please provide a helpful and accurate response based on the PDF content.`;
     });
 
     const result = await genAI.models.generateContent({
-      model: "learnlm-2.0-flash-experimental",
+      model: "gemini-1.5-flash",
       contents: prompt,
     });
 
@@ -51,10 +62,40 @@ Please provide a helpful and accurate response based on the PDF content.`;
       message: text,
       documentId,
     });
-  } catch (error) {
+  } catch (error: unknown) {
     console.error("Chat error:", error);
+
+    // Handle specific Gemini API errors
+    const errorStatus = (error as { status?: number })?.status;
+
+    if (errorStatus === 503) {
+      return NextResponse.json(
+        {
+          error:
+            "AI service is temporarily unavailable. Please try again in a moment.",
+        },
+        { status: 503 }
+      );
+    }
+
+    if (errorStatus === 429) {
+      return NextResponse.json(
+        {
+          error: "Too many requests. Please wait a moment before trying again.",
+        },
+        { status: 429 }
+      );
+    }
+
+    if (errorStatus === 400) {
+      return NextResponse.json(
+        { error: "Invalid request. Please check your input." },
+        { status: 400 }
+      );
+    }
+
     return NextResponse.json(
-      { error: "Failed to process chat request" },
+      { error: "Failed to process chat request. Please try again." },
       { status: 500 }
     );
   }
