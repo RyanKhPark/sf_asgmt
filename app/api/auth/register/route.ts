@@ -1,5 +1,4 @@
 import { NextRequest, NextResponse } from "next/server";
-import bcrypt from "bcryptjs";
 import { signUpSchema } from "@/lib/validations";
 import type { AuthResponse } from "@/types/auth";
 
@@ -20,7 +19,7 @@ export async function POST(request: NextRequest): Promise<NextResponse<AuthRespo
       );
     }
 
-    const { email, password, name } = validation.data;
+    const { email, name } = validation.data;
 
     // TODO: Check if user already exists
     // const existingUser = await getUserByEmail(email);
@@ -31,19 +30,17 @@ export async function POST(request: NextRequest): Promise<NextResponse<AuthRespo
     //   );
     // }
 
-    // Hash the password for future database storage
-    const hashedPassword = await bcrypt.hash(password, 12);
-
-    // TODO: Save to database
+    // TODO: Hash password and save to database when implementing persistence
+    // const hashedPassword = await bcrypt.hash(password, 12);
     // const user = await createUser({
     //   email,
     //   name,
     //   password: hashedPassword,
     // });
 
-    // Temporary implementation - remove hashedPassword from logging for security
-    console.log("🔐 Creating user:", { email, name });
-    console.log("Password hashed successfully");
+    // Temporary implementation - just validate and return success
+    console.log("🔐 User registration request:", { email, name });
+    console.log("✅ Password validation passed");
 
     const user = {
       id: Date.now().toString(),
