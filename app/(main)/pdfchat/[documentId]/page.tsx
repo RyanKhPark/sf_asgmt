@@ -1,6 +1,7 @@
 import { notFound } from "next/navigation";
 import { auth } from "@/auth";
 import { db } from "@/lib/db";
+import { PDFViewer } from "@/components/pdf/pdf-viewer";
 
 interface PDFChatPageProps {
   params: {
@@ -21,20 +22,21 @@ export default async function PDFChatPage({ params }: PDFChatPageProps) {
     },
   });
 
-  if (!document) {
+  if (!document || !document.fileUrl) {
     notFound();
   }
 
   return (
-    <div className="flex flex-col h-screen">
-      <div className="p-4 border-b">
-        <h1 className="text-2xl font-bold">{document.title}</h1>
-        <p className="text-gray-600">Chat with your PDF</p>
+    <div className="flex h-screen bg-white">
+      <div className="w-1/2 border-r border-gray-300">
+        <PDFViewer
+          fileUrl={document.fileUrl}
+          title={document.title}
+          totalPages={document.totalPages || undefined}
+        />
       </div>
 
-      <div className="flex-1 p-4">
-        <p className="text-gray-500">PDF Chat interface</p>
-      </div>
+      <div className="w-1/2 flex flex-col"></div>
     </div>
   );
 }
