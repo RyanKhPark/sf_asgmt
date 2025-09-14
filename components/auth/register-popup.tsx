@@ -37,46 +37,48 @@ export function RegisterPopup() {
     setIsVisible(false);
   };
 
-  if (session || !isVisible) {
+  if (session) {
     return null;
   }
 
   return (
     <>
-      <div className="fixed top-4 right-4 z-50 bg-white border border-gray-200 rounded-lg shadow-lg p-4 max-w-sm">
-        <button
-          onClick={handleClose}
-          className="absolute top-2 right-2 text-gray-400 hover:text-gray-600"
-        >
-          <X className="size-4" />
-        </button>
+      {isVisible && (
+        <div className="fixed top-4 right-4 z-50 bg-white border border-gray-200 rounded-lg shadow-lg p-4 max-w-sm">
+          <button
+            onClick={handleClose}
+            className="absolute top-2 right-2 text-gray-400 hover:text-gray-600"
+          >
+            <X className="size-4" />
+          </button>
 
-        <div className="pr-6">
-          <h3 className="font-semibold text-sm mb-1">
-            Get started for free!
-          </h3>
-          <p className="text-xs text-gray-600 mb-3">
-            Sign up to save your chat history and access premium features.
-          </p>
-          <div className="space-y-2">
-            <Button
-              onClick={handleGoogleSignUp}
-              size="sm"
-              className="w-full"
-            >
-              Continue with Google
-            </Button>
-            <Button
-              onClick={handleEmailSignUp}
-              size="sm"
-              variant="outline"
-              className="w-full"
-            >
-              Continue with Email
-            </Button>
+          <div className="pr-6">
+            <h3 className="font-semibold text-sm mb-1">
+              Get started for free!
+            </h3>
+            <p className="text-xs text-gray-600 mb-3">
+              Sign up to save your chat history and access premium features.
+            </p>
+            <div className="space-y-2">
+              <Button
+                onClick={handleGoogleSignUp}
+                size="sm"
+                className="w-full"
+              >
+                Continue with Google
+              </Button>
+              <Button
+                onClick={handleEmailSignUp}
+                size="sm"
+                variant="outline"
+                className="w-full"
+              >
+                Continue with Email
+              </Button>
+            </div>
           </div>
         </div>
-      </div>
+      )}
 
       <AuthModal
         isOpen={showAuthModal}

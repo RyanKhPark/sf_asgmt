@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
-import bcrypt from "bcryptjs";
 import { signUpSchema } from "@/lib/validations";
 import type { AuthResponse } from "@/types/auth";
+import { getUserByEmail, createUser } from "@/lib/user";
 
 export async function POST(request: NextRequest): Promise<NextResponse<AuthResponse>> {
   try {
@@ -20,46 +20,50 @@ export async function POST(request: NextRequest): Promise<NextResponse<AuthRespo
       );
     }
 
-    const { email, password, name } = validation.data;
+    const { email, name, password } = validation.data;
 
-    // TODO: Check if user already exists
-    // const existingUser = await getUserByEmail(email);
-    // if (existingUser) {
-    //   return NextResponse.json(
-    //     { success: false, error: "User already exists" },
-    //     { status: 409 }
-    //   );
-    // }
+    // Check if user already exists
+    const existingUser = await getUserByEmail(email);
+    if (existingUser) {
+      return NextResponse.json(
+        { success: false, error: "User already exists" },
+        { status: 409 }
+      );
+    }
 
-    // Hash the password for future database storage
-    const hashedPassword = await bcrypt.hash(password, 12);
-
-    // TODO: Save to database
-    // const user = await createUser({
-    //   email,
-    //   name,
-    //   password: hashedPassword,
-    // });
-
-    // Temporary implementation - remove hashedPassword from logging for security
-    console.log("🔐 Creating user:", { email, name });
-    console.log("Password hashed successfully");
-
-    const user = {
-      id: Date.now().toString(),
+    // Create new user
+    const user = await createUser({
       email,
       name,
-    };
+      password,
+    });
+
+    console.log("✅ User created successfully:", { id: user.id, email: user.email });
 
     return NextResponse.json(
       {
         success: true,
-        user,
+        user: {
+          id: user.id,
+          email: user.email,
+          name: user.name,
+        },
       },
       { status: 201 }
     );
   } catch (error) {
     console.error("Signup error:", error);
+
+    // Handle specific database errors
+    if (error instanceof Error) {
+      if (error.message.includes("Unique constraint")) {
+        return NextResponse.json(
+          { success: false, error: "User already exists" },
+          { status: 409 }
+        );
+      }
+    }
+
     return NextResponse.json(
       { success: false, error: "Internal server error" },
       { status: 500 }
