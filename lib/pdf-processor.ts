@@ -58,12 +58,13 @@ export async function processPDF(fileBuffer: Buffer): Promise<PDFProcessingResul
 }
 
 // Custom page rendering function for better text extraction
-function render_page(pageData: any) {
+function render_page(pageData: { getTextContent(): Promise<{ items: Array<{ str: string; transform: number[] }> }> }) {
   // Return text content from page
-  return pageData.getTextContent().then((textContent: any) => {
-    let lastY, text = '';
-    for (let item of textContent.items) {
-      if (lastY == item.transform[5] || !lastY) {
+  return pageData.getTextContent().then((textContent: { items: Array<{ str: string; transform: number[] }> }) => {
+    let lastY: number | undefined;
+    let text = '';
+    for (const item of textContent.items) {
+      if (lastY === item.transform[5] || !lastY) {
         text += item.str;
       } else {
         text += '\n' + item.str;

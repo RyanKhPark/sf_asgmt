@@ -72,7 +72,6 @@ export async function POST(request: NextRequest) {
     // Upload to Vercel Blob
     const blob = await put(uniqueFilename, file, {
       access: "public",
-      handleUploadUrl: "/api/documents/upload/callback",
     });
 
     console.log("📁 File uploaded to blob:", blob.url);
@@ -85,7 +84,7 @@ export async function POST(request: NextRequest) {
         fileUrl: blob.url,
         fileSize: file.size,
         processingStatus: "pending",
-        userId: session.user.id,
+        userId: session.user.id!,
       },
     });
 
