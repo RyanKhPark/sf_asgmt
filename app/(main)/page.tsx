@@ -2,12 +2,15 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
+import { useAuthGuard } from "@/hooks/use-auth-guard";
+import { AuthModal } from "@/components/auth/auth-modal";
 
 export default function Home() {
   const [pdfFile, setPdfFile] = useState<File | null>(null);
   const [pdfUrl, setPdfUrl] = useState("");
   const [isDragging, setIsDragging] = useState(false);
   const router = useRouter();
+  const { requireAuth, showAuthModal, setShowAuthModal } = useAuthGuard();
 
   const handleDragOver = (e: React.DragEvent) => {
     e.preventDefault();
@@ -38,13 +41,21 @@ export default function Home() {
     }
   };
 
+  const handleTextareaFocus = () => {
+    requireAuth();
+  };
+
   const handleUrlChange = (e: React.ChangeEvent<HTMLTextAreaElement>) => {
+    if (!requireAuth()) return;
+
     if (!pdfFile) {
       setPdfUrl(e.target.value);
     }
   };
 
   const handleSubmit = () => {
+    if (!requireAuth()) return;
+
     if (pdfFile || pdfUrl) {
       // TODO: Process PDF and navigate to chat
       console.log("Processing PDF:", pdfFile || pdfUrl);
@@ -68,6 +79,7 @@ export default function Home() {
               id="pdf-input"
               value={pdfFile ? `Selected file: ${pdfFile.name}` : pdfUrl}
               onChange={handleUrlChange}
+              onFocus={handleTextareaFocus}
               onDragOver={handleDragOver}
               onDragLeave={handleDragLeave}
               onDrop={handleDrop}
@@ -140,6 +152,12 @@ export default function Home() {
           </div>
         </div>
       </div>
+
+      <AuthModal
+        isOpen={showAuthModal}
+        onClose={() => setShowAuthModal(false)}
+        mode="signin"
+      />
     </div>
   );
 }
