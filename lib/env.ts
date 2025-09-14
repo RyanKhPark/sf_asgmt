@@ -15,7 +15,7 @@ export const env = {
   NEXTAUTH_SECRET: getRequiredEnvVar("NEXTAUTH_SECRET"),
   GOOGLE_CLIENT_ID: getOptionalEnvVar("GOOGLE_CLIENT_ID"),
   GOOGLE_CLIENT_SECRET: getOptionalEnvVar("GOOGLE_CLIENT_SECRET"),
-  DATABASE_URL: getOptionalEnvVar("DATABASE_URL"),
+  DATABASE_URL: getRequiredEnvVar("DATABASE_URL"),
 } as const;
 
 // Validate auth setup
@@ -24,7 +24,9 @@ export function validateAuthConfig(): void {
     console.warn("⚠️  Google OAuth not configured - Google sign-in will not work");
   }
 
-  if (!env.DATABASE_URL) {
-    console.warn("⚠️  Database not configured - user data will not persist");
+  if (!env.DATABASE_URL.startsWith("postgresql://")) {
+    console.warn("⚠️  DATABASE_URL should start with 'postgresql://' for PostgreSQL");
   }
+
+  console.log("✅ Environment variables validated");
 }

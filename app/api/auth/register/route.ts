@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { signUpSchema } from "@/lib/validations";
 import type { AuthResponse } from "@/types/auth";
+import { getUserByEmail, createUser } from "@/lib/user";
 
 export async function POST(request: NextRequest): Promise<NextResponse<AuthResponse>> {
   try {
@@ -19,44 +20,50 @@ export async function POST(request: NextRequest): Promise<NextResponse<AuthRespo
       );
     }
 
-    const { email, name } = validation.data;
+    const { email, name, password } = validation.data;
 
-    // TODO: Check if user already exists
-    // const existingUser = await getUserByEmail(email);
-    // if (existingUser) {
-    //   return NextResponse.json(
-    //     { success: false, error: "User already exists" },
-    //     { status: 409 }
-    //   );
-    // }
+    // Check if user already exists
+    const existingUser = await getUserByEmail(email);
+    if (existingUser) {
+      return NextResponse.json(
+        { success: false, error: "User already exists" },
+        { status: 409 }
+      );
+    }
 
-    // TODO: Hash password and save to database when implementing persistence
-    // const hashedPassword = await bcrypt.hash(password, 12);
-    // const user = await createUser({
-    //   email,
-    //   name,
-    //   password: hashedPassword,
-    // });
-
-    // Temporary implementation - just validate and return success
-    console.log("🔐 User registration request:", { email, name });
-    console.log("✅ Password validation passed");
-
-    const user = {
-      id: Date.now().toString(),
+    // Create new user
+    const user = await createUser({
       email,
       name,
-    };
+      password,
+    });
+
+    console.log("✅ User created successfully:", { id: user.id, email: user.email });
 
     return NextResponse.json(
       {
         success: true,
-        user,
+        user: {
+          id: user.id,
+          email: user.email,
+          name: user.name,
+        },
       },
       { status: 201 }
     );
   } catch (error) {
     console.error("Signup error:", error);
+
+    // Handle specific database errors
+    if (error instanceof Error) {
+      if (error.message.includes("Unique constraint")) {
+        return NextResponse.json(
+          { success: false, error: "User already exists" },
+          { status: 409 }
+        );
+      }
+    }
+
     return NextResponse.json(
       { success: false, error: "Internal server error" },
       { status: 500 }

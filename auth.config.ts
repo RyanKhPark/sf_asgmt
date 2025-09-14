@@ -3,6 +3,8 @@ import Google from "next-auth/providers/google";
 import Credentials from "next-auth/providers/credentials";
 import { env, validateAuthConfig } from "@/lib/env";
 import type { AuthUser } from "@/types/auth";
+import bcrypt from "bcryptjs";
+import { getUserByEmail } from "@/lib/user";
 
 // Validate environment on startup
 validateAuthConfig();
@@ -19,7 +21,7 @@ export const authConfig = {
 
       // Define protected routes
       const protectedRoutes = ["/history", "/profile"];
-      const isOnProtectedRoute = protectedRoutes.some(route =>
+      const isOnProtectedRoute = protectedRoutes.some((route) =>
         pathname.startsWith(route)
       );
 
@@ -34,7 +36,9 @@ export const authConfig = {
         session.user.id = token.sub;
         // Add provider info to session if available
         if (token.provider) {
-          (session.user as any).provider = token.provider;
+          (session.user as AuthUser).provider = token.provider as
+            | "google"
+            | "credentials";
         }
       }
       return session;
@@ -74,19 +78,25 @@ export const authConfig = {
         }
 
         try {
-          // TODO: Replace with database lookup
-          // const user = await getUserByEmail(credentials.email);
-          // if (!user || !await bcrypt.compare(credentials.password, user.password)) {
-          //   throw new Error("Invalid credentials");
-          // }
+          const user = await getUserByEmail(credentials.email as string);
 
-          // Temporary implementation for testing
-          console.log("🔒 Authentication attempt:", credentials.email);
+          if (!user || !user.password) {
+            return null;
+          }
+
+          const isValidPassword = await bcrypt.compare(
+            credentials.password as string,
+            user.password
+          );
+
+          if (!isValidPassword) {
+            return null;
+          }
 
           return {
-            id: Date.now().toString(),
-            email: credentials.email as string,
-            name: "Test User",
+            id: user.id,
+            email: user.email,
+            name: user.name,
             provider: "credentials",
           };
         } catch (error) {
