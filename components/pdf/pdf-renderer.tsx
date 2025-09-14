@@ -7,7 +7,6 @@ import { Loader2 } from "lucide-react";
 interface PDFRendererProps {
   fileUrl: string;
   currentPage: number;
-  scale: number;
   onDocumentLoad: (numPages: number) => void;
   onError: (error: string) => void;
   onPageRender: () => void;
@@ -16,7 +15,6 @@ interface PDFRendererProps {
 export function PDFRenderer({
   fileUrl,
   currentPage,
-  scale,
   onDocumentLoad,
   onError,
   onPageRender,
@@ -54,9 +52,13 @@ export function PDFRenderer({
 
     console.log("Loading PDF:", fileUrl);
 
+    let isCancelled = false;
+    let renderTask: any = null;
+
     // Simple PDF.js approach from FAQ
     (window as any).pdfjsLib.getDocument(fileUrl).promise
       .then((pdf: any) => {
+        if (isCancelled) return;
         console.log("PDF loaded, pages:", pdf.numPages);
         onDocumentLoad(pdf.numPages);
 
@@ -64,9 +66,10 @@ export function PDFRenderer({
         return pdf.getPage(currentPage);
       })
       .then((page: any) => {
+        if (isCancelled) return;
         console.log("Rendering page:", currentPage);
 
-        const viewport = page.getViewport({ scale });
+        const viewport = page.getViewport({ scale: 1 });
 
         canvas.height = viewport.height;
         canvas.width = viewport.width;
@@ -76,17 +79,28 @@ export function PDFRenderer({
           viewport: viewport
         };
 
-        return page.render(renderContext).promise;
+        renderTask = page.render(renderContext);
+        return renderTask.promise;
       })
       .then(() => {
+        if (isCancelled) return;
         console.log("Page rendered successfully");
         onPageRender();
       })
       .catch((error: any) => {
+        if (isCancelled) return;
         console.error("Error:", error);
         onError(error.message || "Failed to load PDF");
       });
-  }, [isReady, fileUrl, currentPage, scale, onDocumentLoad, onError, onPageRender]);
+
+    // Cleanup function to prevent infinite rendering
+    return () => {
+      isCancelled = true;
+      if (renderTask) {
+        renderTask.cancel();
+      }
+    };
+  }, [isReady, fileUrl, currentPage]);
 
   if (!isReady) {
     return (

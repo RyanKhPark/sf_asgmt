@@ -114,7 +114,6 @@ export function PDFViewer({
             <PDFRenderer
               fileUrl={fileUrl}
               currentPage={currentPage}
-              scale={1}
               onDocumentLoad={handleDocumentLoad}
               onError={handleError}
               onPageRender={handlePageRender}
