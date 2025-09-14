@@ -2,6 +2,7 @@ import { notFound } from "next/navigation";
 import { auth } from "@/auth";
 import { db } from "@/lib/db";
 import { PDFViewer } from "@/components/pdf/pdf-viewer";
+import { PDFChat } from "@/components/pdf/pdf-chat";
 
 interface PDFChatPageProps {
   params: {
@@ -36,7 +37,12 @@ export default async function PDFChatPage({ params }: PDFChatPageProps) {
         />
       </div>
 
-      <div className="w-1/2 flex flex-col"></div>
+      <div className="w-1/2 flex flex-col">
+        <PDFChat
+          documentId={params.documentId}
+          pdfContent={document.extractedText || ""}
+        />
+      </div>
     </div>
   );
 }

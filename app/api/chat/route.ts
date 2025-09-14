@@ -41,7 +41,7 @@ Please provide a helpful and accurate response based on the PDF content.`;
     });
 
     const result = await genAI.models.generateContent({
-      model: "gemini-1.5-flash",
+      model: "learnlm-2.0-flash-experimental",
       contents: prompt,
     });
 
