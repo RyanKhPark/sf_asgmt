@@ -3,8 +3,8 @@ import { User as NextAuthUser } from "next-auth";
 export interface AuthUser extends NextAuthUser {
   id: string;
   email: string;
-  name?: string;
-  image?: string;
+  name?: string | null;
+  image?: string | null;
   provider?: "google" | "credentials";
 }
 
