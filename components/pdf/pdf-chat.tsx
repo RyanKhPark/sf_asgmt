@@ -13,9 +13,10 @@ interface Message {
 interface PDFChatProps {
   documentId: string;
   pdfContent?: string;
+  onHighlightText?: (highlightedPhrases: string[]) => void;
 }
 
-export function PDFChat({ documentId, pdfContent }: PDFChatProps) {
+export function PDFChat({ documentId, pdfContent, onHighlightText }: PDFChatProps) {
   const [messages, setMessages] = useState<Message[]>([]);
   const [inputValue, setInputValue] = useState("");
   const [isLoading, setIsLoading] = useState(false);
@@ -25,6 +26,127 @@ export function PDFChat({ documentId, pdfContent }: PDFChatProps) {
 
   const scrollToBottom = () => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
+  };
+
+  // Utility function to normalize text for better matching
+  const normalizeText = (text: string): string => {
+    return text
+      .replace(/\s+/g, ' ') // Normalize whitespace
+      .replace(/[\r\n\t]/g, ' ') // Replace line breaks with spaces
+      .replace(/[""'']/g, '"') // Normalize quotes
+      .trim()
+      .toLowerCase();
+  };
+
+  // Extract quoted text from AI response
+  const extractQuotedText = (aiResponse: string): string[] => {
+    const quotes: string[] = [];
+
+    // Match text in double quotes
+    const doubleQuoteMatches = aiResponse.match(/"([^"]+)"/g);
+    if (doubleQuoteMatches) {
+      quotes.push(...doubleQuoteMatches.map(match => match.slice(1, -1)));
+    }
+
+    // Match text in smart quotes
+    const smartQuoteMatches = aiResponse.match(/[""]([^""]+)[""]|['']([^'']+)['']/g);
+    if (smartQuoteMatches) {
+      quotes.push(...smartQuoteMatches.map(match => {
+        // Remove the outer quotes
+        return match.slice(1, -1);
+      }));
+    }
+
+    return quotes.filter(quote => quote.length > 10); // Only consider substantial quotes
+  };
+
+  // Find text in PDF with fuzzy matching
+  const findTextInPDF = (searchText: string, pdfText: string): boolean => {
+    if (!pdfText || !searchText) return false;
+
+    const normalizedSearch = normalizeText(searchText);
+    const normalizedPDF = normalizeText(pdfText);
+
+    // Direct match
+    if (normalizedPDF.includes(normalizedSearch)) {
+      return true;
+    }
+
+    // Split into words for fuzzy matching
+    const searchWords = normalizedSearch.split(' ').filter(w => w.length > 2);
+    const pdfWords = normalizedPDF.split(' ');
+
+    // Check if most words (70%+) are found
+    let foundWords = 0;
+    for (const word of searchWords) {
+      if (pdfWords.some(pdfWord => pdfWord.includes(word) || word.includes(pdfWord))) {
+        foundWords++;
+      }
+    }
+
+    return foundWords / searchWords.length >= 0.7;
+  };
+
+  // Process AI response for highlighting
+  const processAIResponseForHighlighting = (aiResponse: string) => {
+    console.log("=== STARTING AI RESPONSE HIGHLIGHTING ===");
+    console.log("AI Response:", aiResponse);
+
+    if (!pdfContent) {
+      console.log("❌ No PDF content available for highlighting");
+      return;
+    }
+
+    const quotedTexts = extractQuotedText(aiResponse);
+    console.log(`Found ${quotedTexts.length} quoted texts:`, quotedTexts);
+
+    const matchedPhrases: string[] = [];
+
+    for (const quotedText of quotedTexts) {
+      console.log(`Searching for quoted text: "${quotedText}"`);
+
+      if (findTextInPDF(quotedText, pdfContent)) {
+        console.log(`✅ Match found for: "${quotedText}"`);
+        matchedPhrases.push(quotedText);
+      } else {
+        console.log(`❌ No match found for: "${quotedText}"`);
+      }
+    }
+
+    if (matchedPhrases.length > 0) {
+      console.log(`🎯 Total matched phrases: ${matchedPhrases.length}`);
+      onHighlightText?.(matchedPhrases);
+    } else {
+      console.log("📄 No quoted text found, searching for overlapping content...");
+
+      // Try to find overlapping content using keyword matching
+      const aiWords = normalizeText(aiResponse).split(' ').filter(w => w.length > 3);
+      const pdfWords = normalizeText(pdfContent).split(' ');
+
+      const commonWords = aiWords.filter(word =>
+        pdfWords.some(pdfWord => pdfWord.includes(word))
+      );
+
+      console.log(`PDF contains ${pdfWords.length} unique words and ${commonWords.length} common phrases`);
+
+      if (commonWords.length > 5) {
+        // Find phrases of 3-5 consecutive common words
+        const phrases: string[] = [];
+        for (let i = 0; i < commonWords.length - 2; i++) {
+          const phrase = commonWords.slice(i, i + 3).join(' ');
+          if (findTextInPDF(phrase, pdfContent)) {
+            phrases.push(phrase);
+          }
+        }
+
+        if (phrases.length > 0) {
+          console.log(`Found ${phrases.length} potential matches, highlighting top ${Math.min(3, phrases.length)}`);
+          onHighlightText?.(phrases.slice(0, 3));
+        }
+      }
+    }
+
+    console.log("=== HIGHLIGHTING COMPLETE ===");
   };
 
   useEffect(() => {
@@ -91,6 +213,11 @@ export function PDFChat({ documentId, pdfContent }: PDFChatProps) {
       };
 
       setMessages((prev) => [...prev, aiMessage]);
+
+      // Process AI response for highlighting
+      setTimeout(() => {
+        processAIResponseForHighlighting(data.message);
+      }, 100);
     } catch (error) {
       console.error("Chat error:", error);
       const errorMessage: Message = {
@@ -104,7 +231,7 @@ export function PDFChat({ documentId, pdfContent }: PDFChatProps) {
     }
   };
 
-  const handleKeyPress = (e: React.KeyboardEvent) => {
+  const handleKeyDown = (e: React.KeyboardEvent) => {
     if (e.key === "Enter" && !e.shiftKey) {
       e.preventDefault();
       handleSendMessage();
@@ -183,7 +310,7 @@ export function PDFChat({ documentId, pdfContent }: PDFChatProps) {
           <textarea
             value={inputValue}
             onChange={(e) => setInputValue(e.target.value)}
-            onKeyPress={handleKeyPress}
+            onKeyDown={handleKeyDown}
             placeholder="Ask a question about this document..."
             className="flex-1 resize-none border border-gray-300 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
             rows={1}

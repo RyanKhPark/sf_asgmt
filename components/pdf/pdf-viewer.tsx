@@ -10,12 +10,14 @@ interface PDFViewerProps {
   fileUrl: string;
   title: string;
   totalPages?: number;
+  highlightPhrases?: string[];
 }
 
 export function PDFViewer({
   fileUrl,
   title,
   totalPages: initialTotalPages,
+  highlightPhrases = [],
 }: PDFViewerProps) {
   const [currentPage, setCurrentPage] = useState(1);
   const [numPages, setNumPages] = useState<number | null>(
@@ -117,6 +119,7 @@ export function PDFViewer({
               onDocumentLoad={handleDocumentLoad}
               onError={handleError}
               onPageRender={handlePageRender}
+              highlightPhrases={highlightPhrases}
             />
           )}
         </div>
