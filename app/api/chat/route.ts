@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
-import { GoogleGenAI } from "@google/genai";
+import { generateText } from "ai";
+import { anthropic } from "@ai-sdk/anthropic";
 import { auth } from "@/auth";
 import { db } from "@/lib/db";
 
@@ -19,51 +20,63 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    const apiKey = process.env.GEMINI_API_KEY;
+    const apiKey = process.env.ANTHROPIC_API_KEY;
     if (!apiKey) {
       return NextResponse.json(
-        { error: "Gemini API key not configured" },
+        { error: "Anthropic API key not configured" },
         { status: 500 }
       );
     }
 
-    const genAI = new GoogleGenAI({ apiKey: apiKey });
-
     // Build context from PDF content if available
     let prompt = message;
     if (pdfContent) {
-      prompt = `You are an expert professor and academic mentor. You have access to the following document content, and you should engage in a scholarly discussion with the student about the topic, concepts, and broader implications.
+      prompt = `You are an expert professor and academic mentor. Use ONLY the following Document Content to answer. Stay grounded in it and do not fabricate details.
 
 Document Content:
 ${pdfContent}
 
-Student Question/Comment: ${message}
+Instructions (strict):
+- Base every claim on the Document Content above.
+- If the required information is not present, reply exactly: "This specific information is not present in the document."
+- Do NOT include any fictional dialog, role labels, or stage directions.
+- Do NOT include lines beginning with labels like "Student:", "Professor:", "Teacher:", or "Assistant:".
+- Do NOT echo back the prompt section headers or the student's message label.
+- Keep responses concise and focused.
+- If unclear, ask a brief clarifying question.
 
-Instructions:
-* No need to answer regardless of a question
-* Unnecessarily long responses are not appreciated, do not provide unnecessary details
-* When not understanding the question, ask for clarification
-1. If the student asks a direct question about the document, provide a comprehensive answer based on the content
-2. If the student wants to discuss the topic more broadly, engage in an educational conversation about related concepts, applications, and implications
-3. Encourage critical thinking by asking follow-up questions when appropriate
-4. Provide additional context and connections to related topics when helpful
-5. Maintain a professional but approachable academic tone
-6. If the question goes beyond the document scope, acknowledge this but still provide relevant insights from your expertise
+Student question:
+${message}
 
-Please respond as a knowledgeable professor would in an academic discussion.`;
+Respond directly to the student as a professor, in plain prose, without any role labels or fictional conversation.`;
     }
 
-    console.log("Sending to Gemini:", {
+    console.log("Sending to Anthropic:", {
       documentId,
       messageLength: message.length,
     });
 
-    const result = await genAI.models.generateContent({
-      model: "gemini-1.5-flash",
-      contents: prompt,
+    const result = await generateText({
+      model: anthropic("claude-3-haiku-20240307"),
+      messages: [
+        {
+          role: "user",
+          content: prompt,
+        },
+      ],
+      temperature: 0.2,
     });
 
-    const text = result.text;
+    // Sanitize unwanted dialog/labels from the response
+    let text = (result.text || "").trim();
+    if (text) {
+      const bannedPrefix = /^(\s*)(student(?:'s message)?|professor|teacher|assistant)\s*:/i;
+      text = text
+        .split("\n")
+        .filter((line) => !bannedPrefix.test(line))
+        .join("\n")
+        .trim();
+    }
 
     // Save both user message and AI response to database if conversationId provided
     if (conversationId) {
@@ -109,7 +122,7 @@ Please respond as a knowledgeable professor would in an academic discussion.`;
   } catch (error: unknown) {
     console.error("Chat error:", error);
 
-    // Handle specific Gemini API errors
+    // Handle specific API errors
     const errorStatus = (error as { status?: number })?.status;
 
     if (errorStatus === 503) {

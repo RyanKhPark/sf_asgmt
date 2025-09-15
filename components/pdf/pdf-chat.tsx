@@ -13,9 +13,11 @@ interface Message {
 interface PDFChatProps {
   documentId: string;
   pdfContent?: string;
+  onHighlightText?: (phrases: string[]) => void;
+  externalNotice?: string;
 }
 
-export function PDFChat({ documentId, pdfContent }: PDFChatProps) {
+export function PDFChat({ documentId, pdfContent, onHighlightText, externalNotice }: PDFChatProps) {
   const [messages, setMessages] = useState<Message[]>([]);
   const [inputValue, setInputValue] = useState("");
   const [isLoading, setIsLoading] = useState(false);
@@ -30,6 +32,17 @@ export function PDFChat({ documentId, pdfContent }: PDFChatProps) {
   useEffect(() => {
     scrollToBottom();
   }, [messages]);
+
+  // Inject external notices as assistant messages when provided
+  useEffect(() => {
+    if (!externalNotice) return;
+    const notice: Message = {
+      id: `notice-${Date.now()}`,
+      text: externalNotice,
+      isUser: false,
+    };
+    setMessages((prev) => [...prev, notice]);
+  }, [externalNotice]);
 
   // Load chat history on component mount
   useEffect(() => {
@@ -91,6 +104,16 @@ export function PDFChat({ documentId, pdfContent }: PDFChatProps) {
       };
 
       setMessages((prev) => [...prev, aiMessage]);
+
+      // Use AI to extract topic and find matching PDF content
+      if (onHighlightText && data.message) {
+        // Send the AI response for analysis - the analysis system will use AI to:
+        // 1. Extract the essential topic from the response
+        // 2. Find matching content in the PDF text
+        // 3. Return relevant phrases for highlighting
+        console.log(`🎯 Triggering highlight analysis for AI response: "${data.message}"`);
+        onHighlightText([data.message]);
+      }
     } catch (error) {
       console.error("Chat error:", error);
       const errorMessage: Message = {
@@ -104,7 +127,7 @@ export function PDFChat({ documentId, pdfContent }: PDFChatProps) {
     }
   };
 
-  const handleKeyPress = (e: React.KeyboardEvent) => {
+  const handleKeyDown = (e: React.KeyboardEvent) => {
     if (e.key === "Enter" && !e.shiftKey) {
       e.preventDefault();
       handleSendMessage();
@@ -183,7 +206,7 @@ export function PDFChat({ documentId, pdfContent }: PDFChatProps) {
           <textarea
             value={inputValue}
             onChange={(e) => setInputValue(e.target.value)}
-            onKeyPress={handleKeyPress}
+            onKeyDown={handleKeyDown}
             placeholder="Ask a question about this document..."
             className="flex-1 resize-none border border-gray-300 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
             rows={1}
