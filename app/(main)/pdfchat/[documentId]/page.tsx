@@ -1,8 +1,7 @@
 import { notFound } from "next/navigation";
 import { auth } from "@/auth";
 import { db } from "@/lib/db";
-import { PDFViewer } from "@/components/pdf/pdf-viewer";
-import { PDFChat } from "@/components/pdf/pdf-chat";
+import { PDFChatWrapper } from "./pdf-chat-wrapper";
 
 interface PDFChatPageProps {
   params: {
@@ -28,21 +27,14 @@ export default async function PDFChatPage({ params }: PDFChatPageProps) {
   }
 
   return (
-    <div className="flex h-screen bg-white">
-      <div className="w-1/2 border-r border-gray-300">
-        <PDFViewer
-          fileUrl={document.fileUrl}
-          title={document.title}
-          totalPages={document.totalPages || undefined}
-        />
-      </div>
-
-      <div className="w-1/2 flex flex-col">
-        <PDFChat
-          documentId={params.documentId}
-          pdfContent={document.extractedText || ""}
-        />
-      </div>
-    </div>
+    <PDFChatWrapper
+      document={{
+        id: document.id,
+        title: document.title,
+        fileUrl: document.fileUrl,
+        extractedText: document.extractedText,
+        totalPages: document.totalPages,
+      }}
+    />
   );
 }

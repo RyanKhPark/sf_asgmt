@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
-import { GoogleGenAI } from "@google/genai";
+import { generateText } from "ai";
+import { anthropic } from "@ai-sdk/anthropic";
 import { auth } from "@/auth";
 import { db } from "@/lib/db";
 
@@ -19,48 +20,51 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    const apiKey = process.env.GEMINI_API_KEY;
+    const apiKey = process.env.ANTHROPIC_API_KEY;
     if (!apiKey) {
       return NextResponse.json(
-        { error: "Gemini API key not configured" },
+        { error: "Anthropic API key not configured" },
         { status: 500 }
       );
     }
 
-    const genAI = new GoogleGenAI({ apiKey: apiKey });
-
     // Build context from PDF content if available
     let prompt = message;
     if (pdfContent) {
-      prompt = `You are an expert professor and academic mentor. You have access to the following document content, and you should engage in a scholarly discussion with the student about the topic, concepts, and broader implications.
+      prompt = `You are an expert professor and academic mentor. You have access to the following document content, and you should engage in a scholarly discussion with the student. Your chat responses should be based on the uploaded PDF content.
 
 Document Content:
 ${pdfContent}
 
-Student Question/Comment: ${message}
-
 Instructions:
-* No need to answer regardless of a question
-* Unnecessarily long responses are not appreciated, do not provide unnecessary details
-* When not understanding the question, ask for clarification
-1. If the student asks a direct question about the document, provide a comprehensive answer based on the content
-2. If the student wants to discuss the topic more broadly, engage in an educational conversation about related concepts, applications, and implications
-3. Encourage critical thinking by asking follow-up questions when appropriate
-4. Provide additional context and connections to related topics when helpful
-5. Maintain a professional but approachable academic tone
-6. If the question goes beyond the document scope, acknowledge this but still provide relevant insights from your expertise
+* Answer the student's question or comment naturally without repeating their input
+* Keep responses concise and focused - avoid unnecessary details
+* When unclear about the question, ask for clarification
+* If the student asks about the document, provide answers based on the content
+* For broader discussions, engage with related concepts and applications
+* Encourage critical thinking with follow-up questions when appropriate
+* Maintain a professional but approachable academic tone
+* If the question goes beyond the document scope, acknowledge this but provide relevant insights
 
-Please respond as a knowledgeable professor would in an academic discussion.`;
+Student's message: "${message}"
+
+Respond as a knowledgeable professor would, directly addressing their question or comment.`;
     }
 
-    console.log("Sending to Gemini:", {
+    console.log("Sending to Anthropic:", {
       documentId,
       messageLength: message.length,
     });
 
-    const result = await genAI.models.generateContent({
-      model: "gemini-1.5-flash",
-      contents: prompt,
+    const result = await generateText({
+      model: anthropic("claude-3-haiku-20240307"),
+      messages: [
+        {
+          role: "user",
+          content: prompt,
+        },
+      ],
+      temperature: 0.7,
     });
 
     const text = result.text;
@@ -109,7 +113,7 @@ Please respond as a knowledgeable professor would in an academic discussion.`;
   } catch (error: unknown) {
     console.error("Chat error:", error);
 
-    // Handle specific Gemini API errors
+    // Handle specific API errors
     const errorStatus = (error as { status?: number })?.status;
 
     if (errorStatus === 503) {
