@@ -38,57 +38,44 @@ export function PDFChat({ documentId, pdfContent, onHighlightText }: PDFChatProp
       .toLowerCase();
   };
 
-  // Extract quoted text from AI response
-  const extractQuotedText = (aiResponse: string): string[] => {
-    const quotes: string[] = [];
 
-    // Match text in double quotes
-    const doubleQuoteMatches = aiResponse.match(/"([^"]+)"/g);
-    if (doubleQuoteMatches) {
-      quotes.push(...doubleQuoteMatches.map(match => match.slice(1, -1)));
-    }
+  // Use AI to find the essential topic from AI answer and locate it in PDF
+  const findTextInPDF = async (aiAnswer: string, pdfText: string): Promise<string | null> => {
+    if (!pdfText || !aiAnswer) return null;
 
-    // Match text in smart quotes
-    const smartQuoteMatches = aiResponse.match(/[""]([^""]+)[""]|['']([^'']+)['']/g);
-    if (smartQuoteMatches) {
-      quotes.push(...smartQuoteMatches.map(match => {
-        // Remove the outer quotes
-        return match.slice(1, -1);
-      }));
-    }
+    console.log(`🤖 Analyzing AI answer to find essential topic in PDF...`);
 
-    return quotes.filter(quote => quote.length > 10); // Only consider substantial quotes
-  };
+    try {
+      const response = await fetch("/api/pdf-analysis", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          aiAnswer: aiAnswer,
+          pdfText: pdfText.substring(0, 10000), // Include more PDF content
+        }),
+      });
 
-  // Find text in PDF with fuzzy matching
-  const findTextInPDF = (searchText: string, pdfText: string): boolean => {
-    if (!pdfText || !searchText) return false;
-
-    const normalizedSearch = normalizeText(searchText);
-    const normalizedPDF = normalizeText(pdfText);
-
-    // Direct match
-    if (normalizedPDF.includes(normalizedSearch)) {
-      return true;
-    }
-
-    // Split into words for fuzzy matching
-    const searchWords = normalizedSearch.split(' ').filter(w => w.length > 2);
-    const pdfWords = normalizedPDF.split(' ');
-
-    // Check if most words (70%+) are found
-    let foundWords = 0;
-    for (const word of searchWords) {
-      if (pdfWords.some(pdfWord => pdfWord.includes(word) || word.includes(pdfWord))) {
-        foundWords++;
+      if (!response.ok) {
+        throw new Error(`PDF analysis failed: ${response.status}`);
       }
-    }
 
-    return foundWords / searchWords.length >= 0.7;
+      const data = await response.json();
+
+      if (data.matchedText) {
+        console.log(`✅ AI found essential topic in PDF: "${data.matchedText}"`);
+        return data.matchedText;
+      } else {
+        console.log(`❌ AI found no relevant topic in PDF for this answer`);
+        return null;
+      }
+    } catch (error) {
+      console.error("AI PDF analysis error:", error);
+      return null;
+    }
   };
 
-  // Process AI response for highlighting
-  const processAIResponseForHighlighting = (aiResponse: string) => {
+  // Process AI response for highlighting - find essential topic and highlight it
+  const processAIResponseForHighlighting = async (aiResponse: string) => {
     console.log("=== STARTING AI RESPONSE HIGHLIGHTING ===");
     console.log("AI Response:", aiResponse);
 
@@ -97,57 +84,27 @@ export function PDFChat({ documentId, pdfContent, onHighlightText }: PDFChatProp
       return;
     }
 
-    const quotedTexts = extractQuotedText(aiResponse);
-    console.log(`Found ${quotedTexts.length} quoted texts:`, quotedTexts);
+    // Use AI to find the essential topic from the answer and locate it in PDF
+    console.log("🎯 Finding essential topic from AI answer...");
+    const essentialTopicText = await findTextInPDF(aiResponse, pdfContent);
 
-    const matchedPhrases: string[] = [];
+    if (essentialTopicText) {
+      // Clean the text by removing outer quotes and normalizing inner quotes
+      const cleanedText = essentialTopicText
+        .replace(/^[""]|[""]$/g, '') // Remove leading/trailing smart quotes
+        .replace(/^"|"$/g, '') // Remove leading/trailing regular quotes
+        .replace(/[""]/g, '"') // Normalize smart quotes to regular quotes
+        .trim();
 
-    for (const quotedText of quotedTexts) {
-      console.log(`Searching for quoted text: "${quotedText}"`);
-
-      if (findTextInPDF(quotedText, pdfContent)) {
-        console.log(`✅ Match found for: "${quotedText}"`);
-        matchedPhrases.push(quotedText);
-      } else {
-        console.log(`❌ No match found for: "${quotedText}"`);
-      }
-    }
-
-    if (matchedPhrases.length > 0) {
-      console.log(`🎯 Total matched phrases: ${matchedPhrases.length}`);
-      onHighlightText?.(matchedPhrases);
+      console.log(`✅ Found essential topic in PDF: "${cleanedText}"`);
+      onHighlightText?.([ cleanedText ]);
     } else {
-      console.log("📄 No quoted text found, searching for overlapping content...");
-
-      // Try to find overlapping content using keyword matching
-      const aiWords = normalizeText(aiResponse).split(' ').filter(w => w.length > 3);
-      const pdfWords = normalizeText(pdfContent).split(' ');
-
-      const commonWords = aiWords.filter(word =>
-        pdfWords.some(pdfWord => pdfWord.includes(word))
-      );
-
-      console.log(`PDF contains ${pdfWords.length} unique words and ${commonWords.length} common phrases`);
-
-      if (commonWords.length > 5) {
-        // Find phrases of 3-5 consecutive common words
-        const phrases: string[] = [];
-        for (let i = 0; i < commonWords.length - 2; i++) {
-          const phrase = commonWords.slice(i, i + 3).join(' ');
-          if (findTextInPDF(phrase, pdfContent)) {
-            phrases.push(phrase);
-          }
-        }
-
-        if (phrases.length > 0) {
-          console.log(`Found ${phrases.length} potential matches, highlighting top ${Math.min(3, phrases.length)}`);
-          onHighlightText?.(phrases.slice(0, 3));
-        }
-      }
+      console.log("❌ No essential topic found in PDF for this AI answer");
     }
 
     console.log("=== HIGHLIGHTING COMPLETE ===");
   };
+
 
   useEffect(() => {
     scrollToBottom();
@@ -215,8 +172,8 @@ export function PDFChat({ documentId, pdfContent, onHighlightText }: PDFChatProp
       setMessages((prev) => [...prev, aiMessage]);
 
       // Process AI response for highlighting
-      setTimeout(() => {
-        processAIResponseForHighlighting(data.message);
+      setTimeout(async () => {
+        await processAIResponseForHighlighting(data.message);
       }, 100);
     } catch (error) {
       console.error("Chat error:", error);

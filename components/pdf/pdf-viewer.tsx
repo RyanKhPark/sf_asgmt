@@ -5,12 +5,17 @@ import { useState, useCallback, useRef } from "react";
 import { ChevronLeft, ChevronRight } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { PDFRenderer } from "./pdf-renderer";
+import { useEffect } from "react";
 
 interface PDFViewerProps {
   fileUrl: string;
   title: string;
   totalPages?: number;
   highlightPhrases?: string[];
+  documentId?: string;
+  highlightStyle?: 'box' | 'underline';
+  highlightColor?: string;
+  persistHighlights?: boolean;
 }
 
 export function PDFViewer({
@@ -18,12 +23,19 @@ export function PDFViewer({
   title,
   totalPages: initialTotalPages,
   highlightPhrases = [],
+  documentId,
+  highlightStyle = 'box',
+  highlightColor,
+  persistHighlights = false,
 }: PDFViewerProps) {
   const [currentPage, setCurrentPage] = useState(1);
   const [numPages, setNumPages] = useState<number | null>(
     initialTotalPages || null
   );
   const [error, setError] = useState<string | null>(null);
+  const [annotations, setAnnotations] = useState<Array<{
+    id: string; pageNumber: number; x: number; y: number; width: number; height: number; color: string; highlightText?: string;
+  }>>([]);
 
   const containerRef = useRef<HTMLDivElement>(null);
 
@@ -58,6 +70,44 @@ export function PDFViewer({
   const handlePageRender = useCallback(() => {
     // Page rendered successfully
   }, []);
+
+  // Load persisted annotations for this document
+  useEffect(() => {
+    let ignore = false;
+    const fetchAnnotations = async () => {
+      if (!documentId) return;
+      try {
+        const res = await fetch(`/api/annotations?documentId=${encodeURIComponent(documentId)}`);
+        if (!res.ok) return;
+        const data = await res.json();
+        if (!ignore && data?.annotations) {
+          setAnnotations(
+            data.annotations.map((a: any) => ({
+              id: a.id,
+              pageNumber: a.pageNumber,
+              x: a.x,
+              y: a.y,
+              width: a.width,
+              height: a.height,
+              color: a.color,
+              highlightText: a.highlightText,
+            }))
+          );
+        }
+      } catch (e) {
+        // ignore
+      }
+    };
+    fetchAnnotations();
+    return () => { ignore = true; };
+  }, [documentId]);
+
+  const handleNavigateToPage = useCallback((pageNumber: number) => {
+    if (numPages && pageNumber >= 1 && pageNumber <= numPages) {
+      setCurrentPage(pageNumber);
+      console.log(`📍 Navigated to page ${pageNumber}`);
+    }
+  }, [numPages]);
 
   return (
     <div className="flex flex-col h-full bg-gray-50">
@@ -103,8 +153,8 @@ export function PDFViewer({
       </div>
 
       {/* PDF Container */}
-      <div ref={containerRef} className="flex-1 overflow-auto p-4 bg-gray-100">
-        <div className="flex justify-center items-center min-h-full">
+      <div ref={containerRef} className="flex-1 overflow-x-auto overflow-y-auto p-4 bg-gray-100">
+        <div className="min-h-full w-fit">
           {error && (
             <div className="text-center p-8">
               <p className="text-red-600 mb-2">Failed to load PDF</p>
@@ -120,6 +170,12 @@ export function PDFViewer({
               onError={handleError}
               onPageRender={handlePageRender}
               highlightPhrases={highlightPhrases}
+              documentId={documentId}
+              onNavigateToPage={handleNavigateToPage}
+              highlightStyle={highlightStyle}
+              highlightColor={highlightColor}
+              persistHighlights={persistHighlights}
+              annotations={annotations}
             />
           )}
         </div>

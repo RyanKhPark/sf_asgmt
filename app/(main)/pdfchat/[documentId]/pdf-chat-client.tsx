@@ -22,6 +22,7 @@ export default function PDFChatClient({
 }: PDFChatClientProps) {
   const [highlightPhrases, setHighlightPhrases] = useState<string[]>([]);
   const [showDebug, setShowDebug] = useState(false);
+  const [highlightStyle, setHighlightStyle] = useState<'box' | 'underline'>('box');
 
   const handleHighlightText = (phrases: string[]) => {
     console.log("PDF Chat Client - Highlighting phrases:", phrases);
@@ -47,6 +48,10 @@ export default function PDFChatClient({
           title={title}
           totalPages={totalPages}
           highlightPhrases={highlightPhrases}
+          documentId={documentId}
+          highlightStyle={highlightStyle}
+          highlightColor={highlightStyle === 'underline' ? '#ff3333' : '#ffeb3b'}
+          persistHighlights={true}
         />
 
         {/* Debug Panel */}
@@ -64,6 +69,14 @@ export default function PDFChatClient({
             <div className="bg-white border rounded-lg shadow-lg p-3 space-y-2 w-64">
               <div className="text-xs font-semibold mb-2">
                 PDF Debug Controls
+              </div>
+
+              <div className="flex items-center justify-between text-xs">
+                <span>Highlight Style</span>
+                <div className="space-x-1">
+                  <Button size="sm" variant={highlightStyle === 'box' ? 'default' : 'outline'} onClick={() => setHighlightStyle('box')}>Box</Button>
+                  <Button size="sm" variant={highlightStyle === 'underline' ? 'default' : 'outline'} onClick={() => setHighlightStyle('underline')}>Underline</Button>
+                </div>
               </div>
 
               <Button
