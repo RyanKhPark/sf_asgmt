@@ -20,6 +20,7 @@ export async function POST(request: NextRequest) {
       height,
       color,
       createdBy,
+      messageId,
     } = await request.json();
 
     if (!documentId || !type || !highlightText || !pageNumber) {
@@ -53,6 +54,25 @@ export async function POST(request: NextRequest) {
       pageNumber,
       text: highlightText.substring(0, 50) + "...",
     });
+
+    // Optionally link to a message if provided and valid
+    if (messageId) {
+      try {
+        const message = await db.message.findFirst({
+          where: { id: messageId },
+          include: { conversation: true },
+        });
+        if (message && message.conversation.userId === session.user.id && message.conversation.documentId === documentId) {
+          await db.messageHighlight.upsert({
+            where: { messageId_annotationId: { messageId, annotationId: annotation.id } },
+            update: {},
+            create: { messageId, annotationId: annotation.id },
+          });
+        }
+      } catch (e) {
+        console.warn("Failed to link message to annotation (optional):", e);
+      }
+    }
 
     return NextResponse.json({
       success: true,

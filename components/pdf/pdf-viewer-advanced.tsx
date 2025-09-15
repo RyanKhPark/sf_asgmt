@@ -63,6 +63,9 @@ interface PDFViewerAdvancedProps {
   onTextSelected?: (text: string, pageNumber: number) => void;
   onHighlightCreated?: (highlight: Highlight) => void;
   aiHighlightPhrases?: string[];
+  activeMessageId?: string; // Optional: link AI highlights to this message
+  aiTopK?: number; // Optional: number of top matches to highlight
+  aiMinScore?: number; // Optional: minimum score threshold
   onDocumentLoad?: (numPages: number) => void;
   onError?: (error: string) => void;
   onNoMatchFound?: (message: string) => void;
@@ -74,6 +77,9 @@ export function PDFViewerAdvanced({
   onTextSelected,
   onHighlightCreated,
   aiHighlightPhrases = [],
+  activeMessageId,
+  aiTopK = 3,
+  aiMinScore = 0.15,
   onDocumentLoad,
   onError,
   onNoMatchFound,
@@ -762,7 +768,7 @@ export function PDFViewerAdvanced({
           }
 
           candidates.sort((a, b) => b.score - a.score);
-          const top = candidates.slice(0, 3).filter(c => c.score > 0.15);
+          const top = candidates.slice(0, aiTopK).filter(c => c.score > aiMinScore);
 
           if (top.length === 0) {
             console.log("❌ No strong sentence match found for AI response");
@@ -814,35 +820,6 @@ export function PDFViewerAdvanced({
 
   return (
     <div className="relative h-full">
-      {/* Selection toolbar */}
-      {selectedText && (
-        <div className="absolute top-4 right-4 z-50 bg-white shadow-lg rounded-lg p-2 flex gap-2">
-          <button
-            onClick={() => createHighlight("#ffff00")}
-            className="px-3 py-1 bg-yellow-300 rounded hover:bg-yellow-400"
-            title="Highlight Yellow"
-          >
-            Highlight
-          </button>
-          <button
-            onClick={() => createHighlight("#90EE90")}
-            className="px-3 py-1 bg-green-300 rounded hover:bg-green-400"
-            title="Highlight Green"
-          >
-            Highlight
-          </button>
-          <button
-            onClick={() => {
-              window.getSelection()?.removeAllRanges();
-              setSelectedText("");
-            }}
-            className="px-3 py-1 bg-gray-200 rounded hover:bg-gray-300"
-          >
-            Cancel
-          </button>
-        </div>
-      )}
-
       {/* PDF container with vertical scroll */}
       <div
         ref={containerRef}

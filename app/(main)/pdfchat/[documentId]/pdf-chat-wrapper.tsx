@@ -35,6 +35,7 @@ export function PDFChatWrapper({ document }: PDFChatWrapperProps) {
   const [aiHighlightPhrases, setAiHighlightPhrases] = useState<string[]>([]);
   const [, setManualHighlights] = useState<Highlight[]>([]);
   const [externalNotice, setExternalNotice] = useState<string | null>(null);
+  const [activeMessageId, setActiveMessageId] = useState<string | null>(null);
 
   const handleTextSelected = useCallback((text: string, pageNumber: number) => {
     console.log(`Text selected on page ${pageNumber}: "${text}"`);
@@ -63,6 +64,7 @@ export function PDFChatWrapper({ document }: PDFChatWrapperProps) {
             height: highlight.rects[0]?.height || 20,
             color: highlight.color,
             createdBy: highlight.type === "manual" ? "user" : "ai",
+            messageId: activeMessageId || undefined,
           }),
         });
 
@@ -74,7 +76,7 @@ export function PDFChatWrapper({ document }: PDFChatWrapperProps) {
         toast.error("Failed to save highlight");
       }
     },
-    [document.id]
+    [document.id, activeMessageId]
   );
 
   const handleAIHighlight = useCallback((phrases: string[]) => {
@@ -120,6 +122,9 @@ export function PDFChatWrapper({ document }: PDFChatWrapperProps) {
               onTextSelected={handleTextSelected}
               onHighlightCreated={handleHighlightCreated}
               aiHighlightPhrases={aiHighlightPhrases}
+              activeMessageId={activeMessageId || undefined}
+              aiTopK={3}
+              aiMinScore={0.15}
               onDocumentLoad={handleDocumentLoad}
               onError={handleError}
               onNoMatchFound={handleNoMatchFound}
@@ -135,6 +140,9 @@ export function PDFChatWrapper({ document }: PDFChatWrapperProps) {
           pdfContent={document.extractedText || ""}
           onHighlightText={handleAIHighlight}
           externalNotice={externalNotice || undefined}
+          // Optional: if your chat API returns a real messageId, call this
+          // @ts-ignore - the PDFChat component may not yet declare this prop
+          onAIMessageSaved={(messageId: string) => setActiveMessageId(messageId)}
         />
       </div>
     </div>

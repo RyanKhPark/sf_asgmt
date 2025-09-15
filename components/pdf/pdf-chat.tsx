@@ -56,6 +56,8 @@ interface PDFChatProps {
   pdfContent?: string;
   onHighlightText?: (phrases: string[]) => void;
   externalNotice?: string;
+  // Optional: invoked when backend returns a persisted assistant messageId
+  onAIMessageSaved?: (messageId: string) => void;
 }
 
 export function PDFChat({
@@ -63,6 +65,7 @@ export function PDFChat({
   pdfContent,
   onHighlightText,
   externalNotice,
+  onAIMessageSaved,
 }: PDFChatProps) {
   const [messages, setMessages] = useState<Message[]>([]);
   const [inputValue, setInputValue] = useState("");
@@ -171,6 +174,11 @@ export function PDFChat({
       };
 
       setMessages((prev) => [...prev, aiMessage]);
+
+      // If API returns a persisted messageId, expose it for linking highlights
+      if (data.messageId && typeof data.messageId === "string") {
+        try { onAIMessageSaved?.(data.messageId); } catch {}
+      }
 
       // Speak the AI response if voice mode is enabled
       if (isConversationModeRef.current && data.message) {
