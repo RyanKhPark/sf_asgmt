@@ -14,9 +14,10 @@ interface PDFChatProps {
   documentId: string;
   pdfContent?: string;
   onHighlightText?: (phrases: string[]) => void;
+  externalNotice?: string;
 }
 
-export function PDFChat({ documentId, pdfContent, onHighlightText }: PDFChatProps) {
+export function PDFChat({ documentId, pdfContent, onHighlightText, externalNotice }: PDFChatProps) {
   const [messages, setMessages] = useState<Message[]>([]);
   const [inputValue, setInputValue] = useState("");
   const [isLoading, setIsLoading] = useState(false);
@@ -31,6 +32,17 @@ export function PDFChat({ documentId, pdfContent, onHighlightText }: PDFChatProp
   useEffect(() => {
     scrollToBottom();
   }, [messages]);
+
+  // Inject external notices as assistant messages when provided
+  useEffect(() => {
+    if (!externalNotice) return;
+    const notice: Message = {
+      id: `notice-${Date.now()}`,
+      text: externalNotice,
+      isUser: false,
+    };
+    setMessages((prev) => [...prev, notice]);
+  }, [externalNotice]);
 
   // Load chat history on component mount
   useEffect(() => {
@@ -95,10 +107,11 @@ export function PDFChat({ documentId, pdfContent, onHighlightText }: PDFChatProp
 
       // Use AI to extract topic and find matching PDF content
       if (onHighlightText && data.message) {
-        // Send the AI response to the analysis system - it will use AI to:
+        // Send the AI response for analysis - the analysis system will use AI to:
         // 1. Extract the essential topic from the response
         // 2. Find matching content in the PDF text
         // 3. Return relevant phrases for highlighting
+        console.log(`🎯 Triggering highlight analysis for AI response: "${data.message}"`);
         onHighlightText([data.message]);
       }
     } catch (error) {

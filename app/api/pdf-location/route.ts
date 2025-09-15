@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { generateText } from "ai";
 import { anthropic } from "@ai-sdk/anthropic";
 
+
 export async function POST(request: NextRequest) {
   try {
     const { aiMatchedPhrase, pdfText } = await request.json();
@@ -56,7 +57,9 @@ EXTRACTION RULES:
 
 RESPONSE FORMAT:
 Page: [page_number]
-Text: [actual_pdf_text_excerpt]
+Text: [exact_pdf_text_excerpt_word_for_word]
+
+IMPORTANT: The "Text" must be the EXACT text as it appears in the PDF, word-for-word, so it can be found and highlighted in the PDF viewer. Do not paraphrase or rewrite - copy the exact text.
 
 If no relevant content found, respond with:
 Page: 0
@@ -69,28 +72,96 @@ Text: NO_MATCH`,
     const aiResponse = result.text.trim();
     console.log(`🤖 AI location response: "${aiResponse}"`);
 
-    // Parse the AI response
+    // Best-effort parse of AI response, but do not early-return on failure
     const pageMatch = aiResponse.match(/Page:\s*(\d+)/);
-    const textMatch = aiResponse.match(/Text:\s*(.+)/s);
+    const textMatch = aiResponse.match(/Text:\s*([\s\S]+)/);
+    const hintedPage = pageMatch ? parseInt(pageMatch[1]) : null;
+    const hintedText = textMatch ? textMatch[1].trim() : null;
 
-    if (!pageMatch || !textMatch || pageMatch[1] === "0" || textMatch[1].trim() === "NO_MATCH") {
-      return NextResponse.json({
-        pageNumber: null,
-        actualText: null,
-        reasoning: "No relevant content found in PDF",
-      });
+    if (hintedPage && hintedText && hintedText !== "NO_MATCH") {
+      console.log(`🔍 AI hints page ${hintedPage} with text: "${hintedText}"`);
+    } else {
+      console.log("ℹ️ AI location hint unavailable or unusable; falling back to deterministic search");
     }
 
-    const pageNumber = parseInt(pageMatch[1]);
-    const actualText = textMatch[1].trim();
+    // DIRECT APPROACH: Search for the exact text that the analysis API found
+    console.log(`🔎 Searching for exact text that analysis API found: "${aiMatchedPhrase}"`);
 
-    console.log(`✅ AI found content on page ${pageNumber}: "${actualText}"`);
+    // Clean the AI matched phrase to get the actual PDF text (remove AI analysis wrapper)
+    let cleanedPhrase = aiMatchedPhrase;
 
+    // Extract actual PDF text from AI response if it's wrapped
+    const quotedMatch = aiMatchedPhrase.match(/"([^"]+)"/);
+    if (quotedMatch) {
+      cleanedPhrase = quotedMatch[1];
+      console.log(`📝 Extracted quoted text: "${cleanedPhrase}"`);
+    }
+
+    // Determine how many pages are in the provided text by scanning "Page N:" markers
+    const pageMarkers = Array.from(pdfText.matchAll(/\bPage\s+(\d+):/g)).map(m => parseInt(m[1]));
+    const maxPage = pageMarkers.length > 0 ? Math.max(...pageMarkers) : 20; // fallback cap
+
+    // Helper to search a specific page index
+    const normalize = (s: string) => s.toLowerCase().replace(/[^\w\s]/g, ' ').replace(/\s+/g, ' ').trim();
+    const searchPage = (i: number, phrase: string) => {
+      const pagePattern = new RegExp(`Page ${i}:(.*?)(?=Page ${i + 1}:|$)`, 's');
+      const pm = pdfText.match(pagePattern);
+      if (!pm) return null;
+      const pageContent = pm[1];
+      const normalizedPageContent = normalize(pageContent);
+      const normalizedPhrase = normalize(phrase);
+
+      if (normalizedPhrase && normalizedPageContent.includes(normalizedPhrase)) {
+        return { pageNumber: i, text: phrase, reason: `Found exact text match on page ${i}` };
+      }
+
+      const phraseWords = normalizedPhrase.split(/\s+/).filter((w: string) => w.length > 2);
+      const matchingWords = phraseWords.filter((word: string) => normalizedPageContent.includes(word));
+      if (matchingWords.length >= Math.max(2, Math.ceil(phraseWords.length * 0.5))) {
+        const sentences = pageContent.split(/[.!?]+/).filter((s: string) => s.trim().length > 10);
+        for (const sentence of sentences) {
+          const normalizedSentence = normalize(sentence);
+          const sentenceMatches = phraseWords.filter((word: string) => normalizedSentence.includes(word));
+          if (sentenceMatches.length >= Math.max(2, Math.ceil(phraseWords.length * 0.5))) {
+            return { pageNumber: i, text: sentence.trim(), reason: `Found related content on page ${i} (${sentenceMatches.length}/${phraseWords.length} words matched)` };
+          }
+        }
+      }
+      return null;
+    };
+
+    // First try the AI-hinted page/text if available
+    if (hintedPage && hintedText && hintedText !== "NO_MATCH") {
+      const hintedResult = searchPage(hintedPage, hintedText);
+      if (hintedResult) {
+        return NextResponse.json({
+          pageNumber: hintedResult.pageNumber,
+          actualText: hintedResult.text,
+          reasoning: hintedResult.reason,
+        });
+      }
+    }
+
+    // Search page by page for the cleaned phrase
+    for (let i = 1; i <= maxPage; i++) {
+      const res = searchPage(i, cleanedPhrase);
+      if (res) {
+        console.log(`✅ ${res.reason}: "${res.text}"`);
+        return NextResponse.json({
+          pageNumber: res.pageNumber,
+          actualText: res.text,
+          reasoning: res.reason,
+        });
+      }
+    }
+
+    console.log(`❌ Could not find the analyzed text in PDF`);
     return NextResponse.json({
-      pageNumber,
-      actualText,
-      reasoning: "AI successfully located relevant content",
+      pageNumber: null,
+      actualText: null,
+      reasoning: "Could not locate the analyzed text in the PDF",
     });
+
 
   } catch (error) {
     console.error("PDF location analysis error:", error);

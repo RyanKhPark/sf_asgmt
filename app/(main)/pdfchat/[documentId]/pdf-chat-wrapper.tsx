@@ -34,6 +34,7 @@ export function PDFChatWrapper({ document }: PDFChatWrapperProps) {
   const [currentPage, setCurrentPage] = useState(1);
   const [aiHighlightPhrases, setAiHighlightPhrases] = useState<string[]>([]);
   const [manualHighlights, setManualHighlights] = useState<Highlight[]>([]);
+  const [externalNotice, setExternalNotice] = useState<string | null>(null);
 
   const handleTextSelected = useCallback((text: string, pageNumber: number) => {
     console.log(`Text selected on page ${pageNumber}: "${text}"`);
@@ -81,6 +82,12 @@ export function PDFChatWrapper({ document }: PDFChatWrapperProps) {
     setAiHighlightPhrases(phrases);
   }, []);
 
+  const handleNoMatchFound = useCallback((message: string) => {
+    // Show toast and notify chat via external notice
+    toast.message(message);
+    setExternalNotice(message + " (This was checked against the current PDF.)");
+  }, []);
+
   const handleDocumentLoad = useCallback((numPages: number) => {
     console.log(`Document loaded with ${numPages} pages`);
   }, []);
@@ -115,6 +122,7 @@ export function PDFChatWrapper({ document }: PDFChatWrapperProps) {
               aiHighlightPhrases={aiHighlightPhrases}
               onDocumentLoad={handleDocumentLoad}
               onError={handleError}
+              onNoMatchFound={handleNoMatchFound}
             />
           </div>
         </div>
@@ -126,6 +134,7 @@ export function PDFChatWrapper({ document }: PDFChatWrapperProps) {
           documentId={document.id}
           pdfContent={document.extractedText || ""}
           onHighlightText={handleAIHighlight}
+          externalNotice={externalNotice || undefined}
         />
       </div>
     </div>

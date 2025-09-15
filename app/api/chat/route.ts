@@ -31,24 +31,24 @@ export async function POST(request: NextRequest) {
     // Build context from PDF content if available
     let prompt = message;
     if (pdfContent) {
-      prompt = `You are an expert professor and academic mentor. You have access to the following document content, and you should engage in a scholarly discussion with the student. Your chat responses should be based on the uploaded PDF content.
+      prompt = `You are an expert professor and academic mentor. Use ONLY the following Document Content to answer. Stay grounded in it and do not fabricate details.
 
 Document Content:
 ${pdfContent}
 
-Instructions:
-* Answer the student's question or comment naturally without repeating their input
-* Keep responses concise and focused - avoid unnecessary details
-* When unclear about the question, ask for clarification
-* If the student asks about the document, provide answers based on the content
-* For broader discussions, engage with related concepts and applications
-* Encourage critical thinking with follow-up questions when appropriate
-* Maintain a professional but approachable academic tone
-* If the question goes beyond the document scope, acknowledge this but provide relevant insights
+Instructions (strict):
+- Base every claim on the Document Content above.
+- If the required information is not present, reply exactly: "This specific information is not present in the document."
+- Do NOT include any fictional dialog, role labels, or stage directions.
+- Do NOT include lines beginning with labels like "Student:", "Professor:", "Teacher:", or "Assistant:".
+- Do NOT echo back the prompt section headers or the student's message label.
+- Keep responses concise and focused.
+- If unclear, ask a brief clarifying question.
 
-Student's message: "${message}"
+Student question:
+${message}
 
-Respond as a knowledgeable professor would, directly addressing their question or comment.`;
+Respond directly to the student as a professor, in plain prose, without any role labels or fictional conversation.`;
     }
 
     console.log("Sending to Anthropic:", {
@@ -64,10 +64,19 @@ Respond as a knowledgeable professor would, directly addressing their question o
           content: prompt,
         },
       ],
-      temperature: 0.7,
+      temperature: 0.2,
     });
 
-    const text = result.text;
+    // Sanitize unwanted dialog/labels from the response
+    let text = (result.text || "").trim();
+    if (text) {
+      const bannedPrefix = /^(\s*)(student(?:'s message)?|professor|teacher|assistant)\s*:/i;
+      text = text
+        .split("\n")
+        .filter((line) => !bannedPrefix.test(line))
+        .join("\n")
+        .trim();
+    }
 
     // Save both user message and AI response to database if conversationId provided
     if (conversationId) {
