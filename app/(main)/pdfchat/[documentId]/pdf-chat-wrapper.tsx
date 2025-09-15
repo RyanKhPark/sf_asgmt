@@ -31,9 +31,9 @@ interface PDFChatWrapperProps {
 
 export function PDFChatWrapper({ document }: PDFChatWrapperProps) {
   const [selectedText, setSelectedText] = useState<string>("");
-  const [currentPage, setCurrentPage] = useState(1);
+  const [, setCurrentPage] = useState(1);
   const [aiHighlightPhrases, setAiHighlightPhrases] = useState<string[]>([]);
-  const [manualHighlights, setManualHighlights] = useState<Highlight[]>([]);
+  const [, setManualHighlights] = useState<Highlight[]>([]);
   const [externalNotice, setExternalNotice] = useState<string | null>(null);
 
   const handleTextSelected = useCallback((text: string, pageNumber: number) => {

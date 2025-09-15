@@ -94,11 +94,24 @@ export function PDFViewerAdvanced({
   useEffect(() => {
     if (typeof window === "undefined") return;
 
-    if (!(window as any).pdfjsLib) {
+    type PDFJSLib = {
+      getDocument: (params: {
+        url: string;
+        cMapUrl: string;
+        cMapPacked: boolean;
+        withCredentials: boolean;
+      }) => { promise: Promise<PDFDocumentProxy> };
+      GlobalWorkerOptions: { workerSrc: string };
+    };
+
+    const w = window as unknown as { pdfjsLib?: PDFJSLib };
+
+    if (!w.pdfjsLib) {
       const script = document.createElement("script");
       script.src = "https://unpkg.com/pdfjs-dist@3.11.174/build/pdf.min.js";
       script.onload = () => {
-        (window as any).pdfjsLib.GlobalWorkerOptions.workerSrc =
+        const w2 = window as unknown as { pdfjsLib: PDFJSLib };
+        w2.pdfjsLib.GlobalWorkerOptions.workerSrc =
           "https://unpkg.com/pdfjs-dist@3.11.174/build/pdf.worker.min.js";
         setIsReady(true);
       };
@@ -654,11 +667,20 @@ export function PDFViewerAdvanced({
 
     // Wait for pages to be rendered before loading highlights
     setTimeout(loadExistingHighlights, 2000);
-  }, [pdfDocument, documentId, highlightsLoaded, pages.length]);
+  }, [pdfDocument, documentId, highlightsLoaded, pages.length, selectAndHighlightText]);
 
   // Process AI highlight phrases using AI analysis
+  // Guard against unnecessary reprocessing using a content signature
+  const lastProcessedSignatureRef = useRef<string | null>(null);
   useEffect(() => {
     if (!pdfDocument || aiHighlightPhrases.length === 0) return;
+
+    const currentSignature = aiHighlightPhrases.join("||");
+    if (lastProcessedSignatureRef.current === currentSignature) {
+      // Already processed this set of phrases; skip rerun
+      return;
+    }
+    lastProcessedSignatureRef.current = currentSignature;
 
     const processAIHighlights = async () => {
       console.log("🎯 Processing AI highlights:", aiHighlightPhrases);
@@ -701,7 +723,8 @@ export function PDFViewerAdvanced({
 
           // 1) Find a matched phrase by scanning chunks
           let matchedPhrase: string | null = null;
-          for (const [idx, chunk] of chunks.entries()) {
+          for (let idx = 0; idx < chunks.length; idx++) {
+            const chunk = chunks[idx];
             console.log(`🤖 Analyzing chunk ${idx + 1}/${chunks.length}`);
             const response = await fetch("/api/pdf-analysis", {
               method: "POST",
@@ -727,7 +750,8 @@ export function PDFViewerAdvanced({
 
           // 2) Locate the matched phrase across chunks, with deterministic fallback
           let located = { pageNumber: null as number | null, actualText: null as string | null };
-          for (const [idx, chunk] of chunks.entries()) {
+          for (let idx = 0; idx < chunks.length; idx++) {
+            const chunk = chunks[idx];
             console.log(`📍 Locating in chunk ${idx + 1}/${chunks.length}`);
             const findResponse = await fetch("/api/pdf-location", {
               method: "POST",
@@ -799,7 +823,7 @@ export function PDFViewerAdvanced({
     };
 
     processAIHighlights();
-  }, [pdfDocument, aiHighlightPhrases, onHighlightCreated]);
+  }, [pdfDocument, aiHighlightPhrases, createManualHighlight, renderPage, selectAndHighlightText, onNoMatchFound]);
 
   if (!isReady) {
     return (

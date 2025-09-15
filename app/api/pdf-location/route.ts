@@ -98,7 +98,7 @@ Text: NO_MATCH`,
     }
 
     // Determine how many pages are in the provided text by scanning "Page N:" markers
-    const pageMarkers = Array.from(pdfText.matchAll(/\bPage\s+(\d+):/g)).map(m => parseInt(m[1]));
+    const pageMarkers = [...pdfText.matchAll(/\bPage\s+(\d+):/g)].map((m: RegExpMatchArray) => parseInt(m[1], 10));
     const maxPage = pageMarkers.length > 0 ? Math.max(...pageMarkers) : 20; // fallback cap
 
     // Helper to search a specific page index
