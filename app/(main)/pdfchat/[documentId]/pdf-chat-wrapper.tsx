@@ -140,8 +140,6 @@ export function PDFChatWrapper({ document }: PDFChatWrapperProps) {
           pdfContent={document.extractedText || ""}
           onHighlightText={handleAIHighlight}
           externalNotice={externalNotice || undefined}
-          // Optional: if your chat API returns a real messageId, call this
-          // @ts-ignore - the PDFChat component may not yet declare this prop
           onAIMessageSaved={(messageId: string) => setActiveMessageId(messageId)}
         />
       </div>
