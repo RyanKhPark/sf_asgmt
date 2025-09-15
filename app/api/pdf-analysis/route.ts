@@ -28,7 +28,7 @@ export async function POST(request: NextRequest) {
       messages: [
         {
           role: "user",
-          content: `Find the most relevant short phrase from the PDF that matches the AI answer's topic.
+          content: `Find the most relevant short phrase from the PDF that matches the AI answer's topic. PRIORITIZE main content over appendix references.
 
 AI ANSWER:
 "${aiAnswer}"
@@ -38,7 +38,13 @@ PDF TEXT:
 
 TASK: Find a SHORT 5-15 word phrase from the PDF text that relates to the main topic discussed in the AI answer.
 
-RULES:
+PRIORITY RULES:
+- PRIORITIZE main body content over appendix/reference mentions
+- Look for actual instructional content, not just references to other sections
+- Choose substantive content that directly addresses the topic
+- Avoid phrases that just mention "see appendix" or "refer to section X"
+
+EXTRACTION RULES:
 - Extract ONLY a short phrase from the PDF text above
 - 5-15 words maximum
 - Must be exact text that appears in the PDF
@@ -47,9 +53,9 @@ RULES:
 - If no relevant phrase exists, return "NO_MATCH"
 
 EXAMPLES:
-AI discusses input devices → Return: "keyboard and mouse are input devices"
+AI discusses input devices → Return: "keyboard and mouse are input devices" (NOT "see appendix for input device info")
 AI discusses assembly language → Return: "assembly language uses symbolic names"
-AI discusses memory → Return: "memory stores data and instructions"
+AI discusses Python installation → Return: "download Python from python.org and run installer" (NOT "Appendix A has installation instructions")
 
 Return only the PDF phrase:`,
         },

@@ -477,32 +477,98 @@ export function PDFViewerAdvanced({
                 const pageNum = locationData.pageNumber;
                 console.log(`📍 AI found content on page ${pageNum}: "${locationData.actualText}"`);
 
-                // Create highlight with actual PDF text
-                const highlight: Highlight = {
-                  id: `ai-highlight-${Date.now()}-${pageNum}`,
-                  pageNumber: pageNum,
-                  text: locationData.actualText,
-                  rects: [{ x: 50, y: 150, width: 400, height: 25 }],
-                  color: "#ffff00",
-                  type: "ai",
-                };
+                // Find the actual text coordinates in the PDF
+                try {
+                  const page = await pdfDocument.getPage(pageNum);
+                  const textContent = await page.getTextContent();
+                  const viewport = page.getViewport({ scale: 1 });
 
-                setHighlights((prev) => [...prev, highlight]);
+                  let highlightRects: Array<{ x: number; y: number; width: number; height: number }> = [];
 
-                // Store in database
-                if (onHighlightCreated) {
-                  onHighlightCreated(highlight);
-                  console.log(`💾 Stored highlight in database`);
-                }
+                  // Search for the text in the page items
+                  const searchText = locationData.actualText.toLowerCase().replace(/[^\w\s]/g, ' ').replace(/\s+/g, ' ').trim();
+                  let fullPageText = '';
+                  let currentPosition = 0;
 
-                // Navigate to the page
-                const pageElement = document.querySelector(`[data-page-index="${pageNum - 1}"]`);
-                if (pageElement) {
-                  console.log(`🔄 Navigating to page ${pageNum}`);
-                  pageElement.scrollIntoView({
-                    behavior: "smooth",
-                    block: "center",
-                  });
+                  for (const item of textContent.items) {
+                    const itemText = (item as PDFTextItem).str;
+                    const itemStart = currentPosition;
+                    const itemEnd = currentPosition + itemText.length;
+                    fullPageText += itemText + ' ';
+                    currentPosition = itemEnd + 1;
+
+                    // Check if our search text overlaps with this item
+                    const normalizedPageText = fullPageText.toLowerCase().replace(/[^\w\s]/g, ' ').replace(/\s+/g, ' ').trim();
+                    if (normalizedPageText.includes(searchText)) {
+                      const transform = (item as PDFTextItem).transform;
+                      if (transform && transform.length >= 6) {
+                        highlightRects.push({
+                          x: transform[4],
+                          y: viewport.height - transform[5] - transform[0],
+                          width: Math.max(100, (item as PDFTextItem).width || 200),
+                          height: Math.max(12, Math.abs(transform[0]) || 16),
+                        });
+                        break; // Found first match, use it
+                      }
+                    }
+                  }
+
+                  // Fallback to center of page if no specific coordinates found
+                  if (highlightRects.length === 0) {
+                    highlightRects = [{
+                      x: viewport.width * 0.1,
+                      y: viewport.height * 0.3,
+                      width: viewport.width * 0.8,
+                      height: 20
+                    }];
+                  }
+
+                  console.log(`📐 Highlight coordinates:`, highlightRects[0]);
+
+                  // Create highlight with actual PDF text and real coordinates
+                  const highlight: Highlight = {
+                    id: `ai-highlight-${Date.now()}-${pageNum}`,
+                    pageNumber: pageNum,
+                    text: locationData.actualText,
+                    rects: highlightRects,
+                    color: "#ffff00",
+                    type: "ai",
+                  };
+
+                  setHighlights((prev) => [...prev, highlight]);
+
+                  // Store in database
+                  if (onHighlightCreated) {
+                    onHighlightCreated(highlight);
+                    console.log(`💾 Stored highlight in database`);
+                  }
+
+                  // Navigate to the page
+                  const pageElement = document.querySelector(`[data-page-index="${pageNum - 1}"]`);
+                  if (pageElement) {
+                    console.log(`🔄 Navigating to page ${pageNum}`);
+                    pageElement.scrollIntoView({
+                      behavior: "smooth",
+                      block: "center",
+                    });
+                  }
+                } catch (error) {
+                  console.error("Error finding text coordinates:", error);
+
+                  // Fallback to simple highlight
+                  const highlight: Highlight = {
+                    id: `ai-highlight-${Date.now()}-${pageNum}`,
+                    pageNumber: pageNum,
+                    text: locationData.actualText,
+                    rects: [{ x: 50, y: 150, width: 400, height: 25 }],
+                    color: "#ffff00",
+                    type: "ai",
+                  };
+
+                  setHighlights((prev) => [...prev, highlight]);
+                  if (onHighlightCreated) {
+                    onHighlightCreated(highlight);
+                  }
                 }
               } else {
                 console.log("❌ AI could not locate the content in PDF");

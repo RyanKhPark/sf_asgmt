@@ -35,13 +35,15 @@ export async function POST(request: NextRequest) {
         documentId,
         userId: session.user.id,
         type,
-        content: highlightText,
+        highlightText,
+        content: highlightText, // Same as highlightText for now
         pageNumber,
         x: x || 0,
         y: y || 0,
         width: width || 100,
         height: height || 20,
         color: color || "#ffff00",
+        createdBy: createdBy || "user",
       },
     });
 

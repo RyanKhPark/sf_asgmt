@@ -28,7 +28,7 @@ export async function POST(request: NextRequest) {
       messages: [
         {
           role: "user",
-          content: `Find the exact location and actual text content from the PDF that relates to the matched phrase.
+          content: `Find the exact location and actual text content from the PDF that relates to the matched phrase. PRIORITIZE main instructional content over appendix references.
 
 MATCHED PHRASE (from previous AI analysis):
 "${aiMatchedPhrase}"
@@ -37,15 +37,22 @@ FULL PDF TEXT WITH PAGE NUMBERS:
 ${pdfText}
 
 TASK:
-1. Find which page contains content related to the matched phrase
+1. Find which page contains the BEST content related to the matched phrase
 2. Extract the ACTUAL text from that page (20-40 words) that contains the relevant information
 3. Return the page number and the actual PDF text
 
-RULES:
+PRIORITY RULES:
+- PRIORITIZE main body content that directly explains or teaches the topic
+- Look for actual instructions, explanations, or substantive content
+- AVOID appendix references, "see section X" mentions, or table of contents entries
+- Choose content that would be most helpful to someone learning the topic
+
+EXTRACTION RULES:
 - Look for content semantically related to the matched phrase
 - Extract the actual text as it appears in the PDF (preserve original wording)
 - Choose a 20-40 word excerpt that contains the core information
 - Return page number as integer
+- Prefer pages with substantial content over brief mentions
 
 RESPONSE FORMAT:
 Page: [page_number]
