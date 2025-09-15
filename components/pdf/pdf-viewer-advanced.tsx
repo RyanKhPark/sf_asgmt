@@ -63,6 +63,9 @@ interface PDFViewerAdvancedProps {
   onTextSelected?: (text: string, pageNumber: number) => void;
   onHighlightCreated?: (highlight: Highlight) => void;
   aiHighlightPhrases?: string[];
+  activeMessageId?: string; // Optional: link AI highlights to this message
+  aiTopK?: number; // Optional: number of top matches to highlight
+  aiMinScore?: number; // Optional: minimum score threshold
   onDocumentLoad?: (numPages: number) => void;
   onError?: (error: string) => void;
   onNoMatchFound?: (message: string) => void;
@@ -74,6 +77,9 @@ export function PDFViewerAdvanced({
   onTextSelected,
   onHighlightCreated,
   aiHighlightPhrases = [],
+  activeMessageId,
+  aiTopK = 3,
+  aiMinScore = 0.15,
   onDocumentLoad,
   onError,
   onNoMatchFound,
@@ -356,7 +362,8 @@ export function PDFViewerAdvanced({
   };
 
   // Function to programmatically select and highlight text
-  const selectAndHighlightText = useCallback(async (pageNumber: number, searchText: string, saveToDatabase = true) => {
+  type SelectOptions = { saveToDatabase?: boolean; type?: "manual" | "ai" };
+  const selectAndHighlightText = useCallback(async (pageNumber: number, searchText: string, options: SelectOptions = { saveToDatabase: true, type: "manual" }) => {
     console.log(`🔍 Attempting to select text on page ${pageNumber}: "${searchText}"`);
 
     // Wait for text layer to be available with retry logic
@@ -455,39 +462,66 @@ export function PDFViewerAdvanced({
         // Trigger the existing text selection handler
         onTextSelected?.(searchText, pageNumber);
 
-        // Create highlight using the existing createHighlight function
+        // Create highlight now depending on options
         setTimeout(() => {
-          console.log(`🎯 Creating highlight for: "${searchText}" (save: ${saveToDatabase})`);
+          const saveToDatabase = options.saveToDatabase ?? true;
+          const type = options.type ?? "manual";
+          console.log(`🎯 Creating highlight for: "${searchText}" (save: ${saveToDatabase}, type: ${type})`);
 
-          if (saveToDatabase) {
-            // For new highlights, use the button click to save to database
-            const highlightButton = document.querySelector('button[title="Highlight Yellow"]') as HTMLButtonElement;
-            if (highlightButton) {
-              highlightButton.click(); // Trigger the existing highlight creation
-            }
-          } else {
-            // For restored highlights, just create the visual highlight without saving
-            const selection = window.getSelection();
-            if (selection && selection.rangeCount > 0) {
-              const range = selection.getRangeAt(0);
-              const rects = range.getClientRects();
+          const selectionNow = window.getSelection();
+          if (selectionNow && selectionNow.rangeCount > 0) {
+            const selRange = selectionNow.getRangeAt(0);
+            const rects = selRange.getClientRects();
 
-              const highlightRects = Array.from(rects).map(rect => ({
-                x: rect.left,
-                y: rect.top,
+            // Find page element and page-relative rects
+            const container = selRange.commonAncestorContainer;
+            const pageElement =
+              (container as Node).nodeType === Node.TEXT_NODE
+                ? (container as Node).parentElement?.closest(".pdf-page-container")
+                : (container as Element).closest(".pdf-page-container");
+
+            let pageRelativeRects: Array<{ x: number; y: number; width: number; height: number }>
+              = Array.from(rects).map(rect => ({ x: rect.left, y: rect.top, width: rect.width, height: rect.height }));
+            if (pageElement) {
+              const pageRect = pageElement.getBoundingClientRect();
+              pageRelativeRects = Array.from(rects).map(rect => ({
+                x: rect.left - pageRect.left,
+                y: rect.top - pageRect.top,
                 width: rect.width,
                 height: rect.height,
               }));
+            }
 
+            if (saveToDatabase) {
+              if (type === "manual") {
+                // Use the existing manual flow to keep behavior consistent
+                const highlightButton = document.querySelector('button[title="Highlight Yellow"]') as HTMLButtonElement;
+                if (highlightButton) {
+                  highlightButton.click(); // Trigger the existing highlight creation (manual)
+                }
+              } else {
+                // Directly create an AI highlight with computed rects
+                const highlight: Highlight = {
+                  id: `ai-highlight-${Date.now()}-${pageNumber}`,
+                  pageNumber,
+                  text: searchText,
+                  rects: pageRelativeRects.length > 0 ? pageRelativeRects : [{ x: 50, y: 150, width: 400, height: 25 }],
+                  color: "#ffff00",
+                  type: "ai",
+                };
+                setHighlights((prev) => [...prev, highlight]);
+                onHighlightCreated?.(highlight);
+              }
+            } else {
+              // Visual only (restoring)
               const highlight: Highlight = {
                 id: `restored-highlight-${Date.now()}-${pageNumber}`,
                 pageNumber,
                 text: searchText,
-                rects: highlightRects.length > 0 ? highlightRects : [{ x: 50, y: 150, width: 400, height: 25 }],
+                rects: pageRelativeRects.length > 0 ? pageRelativeRects : [{ x: 50, y: 150, width: 400, height: 25 }],
                 color: "#ffff00",
                 type: "manual",
               };
-
               setHighlights((prev) => [...prev, highlight]);
               console.log(`✨ Created restored highlight visually`);
             }
@@ -502,7 +536,7 @@ export function PDFViewerAdvanced({
       console.log(`❌ Could not find matching text span for: "${normalizedSearch}"`);
       throw new Error("Text not found in spans");
     }
-  }, [onTextSelected, setSelectedText, highlights.length, setHighlights]);
+  }, [onTextSelected, setSelectedText, highlights.length, setHighlights, onHighlightCreated]);
 
   // Fallback function to create manual highlight
   const createManualHighlight = useCallback((pageNumber: number, text: string) => {
@@ -649,7 +683,7 @@ export function PDFViewerAdvanced({
                 selectAndHighlightText(
                   annotation.pageNumber,
                   annotation.highlightText,
-                  false // Don't save to database again
+                  { saveToDatabase: false }
                 );
               }, 3000 + (annotation.pageNumber * 500)); // Longer delays for text layer rendering
             }
@@ -677,153 +711,103 @@ export function PDFViewerAdvanced({
 
     const currentSignature = aiHighlightPhrases.join("||");
     if (lastProcessedSignatureRef.current === currentSignature) {
-      // Already processed this set of phrases; skip rerun
       return;
     }
     lastProcessedSignatureRef.current = currentSignature;
 
     const processAIHighlights = async () => {
-      console.log("🎯 Processing AI highlights:", aiHighlightPhrases);
+      console.log("🎯 Processing AI highlights (client-side):", aiHighlightPhrases);
+
+      // Helpers
+      const norm = (s: string) => s.toLowerCase().replace(/[^\w\s]/g, " ").replace(/\s+/g, " ").trim();
+      const toWords = (s: string) => norm(s).split(" ").filter(w => w.length >= 3);
+      const sentenceSplit = (s: string) => s
+        .replace(/\n+/g, " ")
+        .split(/(?<=[\.!?])\s+/)
+        .map(t => t.trim())
+        .filter(Boolean);
+      const jaccard = (a: Set<string>, b: Set<string>) => {
+        const inter = new Set([...a].filter(x => b.has(x))).size;
+        const uni = new Set([...a, ...b]).size || 1;
+        return inter / uni;
+      };
+
+      // Extract page texts once
+      type PageText = { page: number; text: string };
+      const pagesText: PageText[] = [];
+      for (let pageNum = 1; pageNum <= pdfDocument.numPages; pageNum++) {
+        const page = await pdfDocument.getPage(pageNum);
+        const textContent = await page.getTextContent();
+        const pageText = textContent.items.map((item: PDFTextItem) => item.str).join(" ");
+        pagesText.push({ page: pageNum, text: pageText });
+      }
 
       for (const aiResponse of aiHighlightPhrases) {
         try {
-          // Extract all PDF text per page
-          type PageText = { page: number; text: string };
-          const pagesText: PageText[] = [];
-          for (let pageNum = 1; pageNum <= pdfDocument.numPages; pageNum++) {
-            const page = await pdfDocument.getPage(pageNum);
-            const textContent = await page.getTextContent();
-            const pageText = textContent.items.map((item: PDFTextItem) => item.str).join(" ");
-            pagesText.push({ page: pageNum, text: pageText });
-          }
+          const aiNorm = norm(aiResponse);
+          const aiWords = new Set(toWords(aiResponse));
 
-          // Build bounded-size chunks while preserving coverage
-          const buildChunks = (maxChars = 35000, maxPages = 25) => {
-            const chunks: string[] = [];
-            let current = "";
-            let count = 0;
-            for (const pt of pagesText) {
-              const pageBlock = `Page ${pt.page}: ${pt.text}\n\n`;
-              const wouldOverflow = current.length + pageBlock.length > maxChars;
-              const tooManyPages = count >= maxPages;
-              if ((wouldOverflow || tooManyPages) && current.length > 0) {
-                chunks.push(current);
-                current = "";
-                count = 0;
-              }
-              current += pageBlock;
-              count += 1;
-            }
-            if (current.length > 0) chunks.push(current);
-            return chunks;
-          };
+          type Candidate = { page: number; sentence: string; score: number };
+          const candidates: Candidate[] = [];
 
-          const chunks = buildChunks();
-          console.log(`🧩 Built ${chunks.length} PDF chunks for analysis`);
-
-          // 1) Find a matched phrase by scanning chunks
-          let matchedPhrase: string | null = null;
-          for (let idx = 0; idx < chunks.length; idx++) {
-            const chunk = chunks[idx];
-            console.log(`🤖 Analyzing chunk ${idx + 1}/${chunks.length}`);
-            const response = await fetch("/api/pdf-analysis", {
-              method: "POST",
-              headers: { "Content-Type": "application/json" },
-              body: JSON.stringify({ aiAnswer: aiResponse, pdfText: chunk }),
-            });
-            if (!response.ok) continue;
-            const data = await response.json();
-            console.log("📄 AI analysis result:", data);
-            if (data.matchedText) {
-              matchedPhrase = data.matchedText as string;
-              break;
+          for (const pt of pagesText) {
+            const sentences = sentenceSplit(pt.text);
+            for (const sent of sentences) {
+              const sNorm = norm(sent);
+              if (!sNorm) continue;
+              const sWords = new Set(toWords(sent));
+              let score = jaccard(aiWords, sWords);
+              // Boost if exact phrase overlap
+              if (sNorm && aiNorm.includes(sNorm)) score += 0.2;
+              if (sNorm.includes(aiNorm)) score += 0.2;
+              // Length regularization to avoid extremely short matches
+              const lenBoost = Math.min(sWords.size / 12, 0.2);
+              score += lenBoost;
+              if (score > 0) candidates.push({ page: pt.page, sentence: sent, score });
             }
           }
 
-          if (!matchedPhrase) {
-            console.log("❌ No matching content found in any chunk");
+          candidates.sort((a, b) => b.score - a.score);
+          const top = candidates.slice(0, aiTopK).filter(c => c.score > aiMinScore);
+
+          if (top.length === 0) {
+            console.log("❌ No strong sentence match found for AI response");
             onNoMatchFound?.("I couldn't find relevant content for that answer in this PDF.");
             continue;
           }
 
-          console.log(`🤖 AI found relevant phrase: "${matchedPhrase}"`);
+          console.log("🏆 Top matches:", top.map(t => ({ page: t.page, score: Number(t.score.toFixed(3)), text: t.sentence.substring(0, 80) + (t.sentence.length > 80 ? "..." : "") })));
 
-          // 2) Locate the matched phrase across chunks, with deterministic fallback
-          let located = { pageNumber: null as number | null, actualText: null as string | null };
-          for (let idx = 0; idx < chunks.length; idx++) {
-            const chunk = chunks[idx];
-            console.log(`📍 Locating in chunk ${idx + 1}/${chunks.length}`);
-            const findResponse = await fetch("/api/pdf-location", {
-              method: "POST",
-              headers: { "Content-Type": "application/json" },
-              body: JSON.stringify({ aiMatchedPhrase: matchedPhrase, pdfText: chunk }),
-            });
-            if (!findResponse.ok) continue;
-            const locationData = await findResponse.json();
-            console.log("🎯 AI location result:", locationData);
-            if (locationData.pageNumber && locationData.actualText) {
-              located = { pageNumber: locationData.pageNumber, actualText: locationData.actualText };
-              break;
-            }
-          }
-
-          // Client-side deterministic fallback if still not located
-          if (!located.pageNumber || !located.actualText) {
-            const norm = (s: string) => s.toLowerCase().replace(/[^\w\s]/g, ' ').replace(/\s+/g, ' ').trim();
-            const nPhrase = norm(matchedPhrase);
-            for (const pt of pagesText) {
-              if (norm(pt.text).includes(nPhrase)) {
-                located = { pageNumber: pt.page, actualText: matchedPhrase };
-                break;
-              }
-            }
-          }
-
-          if (located.pageNumber && located.actualText) {
-            const pageNum = located.pageNumber;
-            console.log(`📍 Found content on page ${pageNum}: "${located.actualText}"`);
-
-            // Proactively render the target page to ensure text layer is ready
+          // Scroll to the best match and highlight it first, then others
+          for (let i = 0; i < top.length; i++) {
+            const { page, sentence } = top[i];
             try {
-              await renderPage(pageNum - 1);
-            } catch (e) {
-              console.warn("Render page call failed (will rely on observer):", e);
-            }
+              await renderPage(page - 1);
+            } catch {}
 
-            // Navigate to the page first
-            const pageElement = document.querySelector(`[data-page-index="${pageNum - 1}"]`);
-            if (pageElement) {
-              console.log(`🔄 Navigating to page ${pageNum}`);
+            const pageElement = document.querySelector(`[data-page-index="${page - 1}"]`);
+            if (i === 0 && pageElement) {
               pageElement.scrollIntoView({ behavior: "smooth", block: "center" });
-
-              // Wait for page to be visible, then programmatically select and highlight the text
-              setTimeout(async () => {
-                try {
-                  // Ensure render attempt just before selection as well
-                  try { await renderPage(pageNum - 1); } catch {}
-                  await selectAndHighlightText(pageNum, located.actualText!);
-                } catch (error) {
-                  console.error("Error selecting text:", error);
-                  // Fallback to manual highlight
-                  createManualHighlight(pageNum, located.actualText!);
-                }
-              }, 1000);
-            } else {
-              // Fallback if page element not found
-              createManualHighlight(pageNum, located.actualText!);
             }
-          } else {
-            console.log("❌ Could not locate the content after chunked search");
-            onNoMatchFound?.("I couldn't locate the referenced content in this PDF.");
+
+            // Let the text layer settle a bit
+            await new Promise(r => setTimeout(r, i === 0 ? 600 : 200));
+
+            try {
+              await selectAndHighlightText(page, sentence, { saveToDatabase: true, type: "ai" });
+            } catch (e) {
+              console.warn("Fallback to manual highlight for:", sentence.substring(0, 60));
+              createManualHighlight(page, sentence);
+            }
           }
-        } catch (error) {
-          console.error("Error processing AI highlight:", error);
+        } catch (err) {
+          console.error("Error in client-side AI highlighting:", err);
         }
       }
     };
 
     processAIHighlights();
-  }, [pdfDocument, aiHighlightPhrases, createManualHighlight, renderPage, selectAndHighlightText, onNoMatchFound]);
+  }, [pdfDocument, aiHighlightPhrases, renderPage, selectAndHighlightText, createManualHighlight, onNoMatchFound]);
 
   if (!isReady) {
     return (
@@ -836,35 +820,6 @@ export function PDFViewerAdvanced({
 
   return (
     <div className="relative h-full">
-      {/* Selection toolbar */}
-      {selectedText && (
-        <div className="absolute top-4 right-4 z-50 bg-white shadow-lg rounded-lg p-2 flex gap-2">
-          <button
-            onClick={() => createHighlight("#ffff00")}
-            className="px-3 py-1 bg-yellow-300 rounded hover:bg-yellow-400"
-            title="Highlight Yellow"
-          >
-            Highlight
-          </button>
-          <button
-            onClick={() => createHighlight("#90EE90")}
-            className="px-3 py-1 bg-green-300 rounded hover:bg-green-400"
-            title="Highlight Green"
-          >
-            Highlight
-          </button>
-          <button
-            onClick={() => {
-              window.getSelection()?.removeAllRanges();
-              setSelectedText("");
-            }}
-            className="px-3 py-1 bg-gray-200 rounded hover:bg-gray-300"
-          >
-            Cancel
-          </button>
-        </div>
-      )}
-
       {/* PDF container with vertical scroll */}
       <div
         ref={containerRef}
