@@ -4,6 +4,7 @@ import { useState, useRef, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { Send, Mic, MicOff, Waves, AudioWaveform } from "lucide-react";
 import { toast } from "sonner";
+import { useTTS } from "@/hooks/use-tts";
 import { MessageBubble } from "@/components/chat/message-bubble";
 import { TypingDots } from "@/components/chat/typing-dots";
 // Using browser TTS for voice synthesis
@@ -179,12 +180,14 @@ export function PDFChat({
 
       // If API returns a persisted messageId, expose it for linking highlights
       if (data.messageId && typeof data.messageId === "string") {
-        try { onAIMessageSaved?.(data.messageId); } catch {}
+        try {
+          onAIMessageSaved?.(data.messageId);
+        } catch {}
       }
 
       // Speak the AI response if voice mode is enabled
       if (isConversationModeRef.current && data.message) {
-        await speakText(data.message);
+        await speak(data.message);
       }
 
       // Use AI to extract topic and find matching PDF content
@@ -251,7 +254,7 @@ export function PDFChat({
 
     recognition.onstart = () => {
       setIsListening(true);
-      
+
       finalTranscriptRef.current = "";
       currentInterimRef.current = "";
     };
@@ -273,7 +276,6 @@ export function PDFChat({
       // Update the final transcript if we got new final results
       if (finalTranscript) {
         finalTranscriptRef.current += finalTranscript;
-        
       }
 
       // Calculate full current transcript
@@ -291,8 +293,6 @@ export function PDFChat({
 
       // In conversation mode, check for auto-submission
       if (isConversationModeRef.current && fullTranscript.trim()) {
-        
-
         // Clear existing timer
         if (silenceTimerRef.current) {
           clearTimeout(silenceTimerRef.current);
@@ -303,7 +303,6 @@ export function PDFChat({
 
         // Check for sentence ending punctuation
         if (trimmedText.match(/[.!?]$/)) {
-          
           submitVoiceMessage(trimmedText);
           return;
         }
@@ -316,7 +315,6 @@ export function PDFChat({
         // Set silence timer (shorter for likely questions)
         const silenceDelay = mightBeQuestion ? 1500 : 2000;
 
-        
         silenceTimerRef.current = setTimeout(() => {
           if (
             finalTranscriptRef.current.trim() ||
@@ -325,12 +323,11 @@ export function PDFChat({
             const finalText = (
               finalTranscriptRef.current + currentInterimRef.current
             ).trim();
-            
+
             submitVoiceMessage(finalText);
           }
         }, silenceDelay);
       } else if (!isConversationModeRef.current && fullTranscript.trim()) {
-        
       }
     };
 
@@ -345,7 +342,6 @@ export function PDFChat({
 
     recognition.onend = () => {
       setIsListening(false);
-      
 
       // Clear any pending timer
       if (silenceTimerRef.current) {
@@ -418,64 +414,16 @@ export function PDFChat({
     sendMessageToAI(trimmedText);
   };
 
-  // Text-to-Speech using browser's speech synthesis
-  const speakText = async (text: string) => {
-    if (!isConversationModeRef.current) return;
-
-    return new Promise<void>((resolve) => {
-      setIsSpeaking(true);
-      useBrowserTTS(text, resolve);
-    });
-  };
-
-  // Browser's speech synthesis with optimized voice selection
-  const useBrowserTTS = (text: string, resolve: () => void) => {
-    if (typeof window === "undefined" || !window.speechSynthesis) {
-      console.error("Speech synthesis not supported");
-      setIsSpeaking(false);
-      resolve();
-      return;
-    }
-
-    // Cancel any ongoing speech
-    window.speechSynthesis.cancel();
-
-    const utterance = new SpeechSynthesisUtterance(text);
-    utterance.rate = 1.0;
-    utterance.pitch = 1.0;
-    utterance.volume = 1.0;
-
-    // Get available voices and select a good one
-    const voices = window.speechSynthesis.getVoices();
-    const preferredVoice =
-      voices.find((v) => v.lang === "en-US" && v.localService) ||
-      voices.find((v) => v.lang === "en-US") ||
-      voices[0];
-
-    if (preferredVoice) {
-      utterance.voice = preferredVoice;
-    }
-
-    utterance.onend = () => {
-      setIsSpeaking(false);
-      restartListeningAfterSpeech();
-      resolve();
-    };
-
-    utterance.onerror = (event) => {
-      console.error("Speech synthesis error:", event);
-      setIsSpeaking(false);
-      resolve();
-    };
-
-    window.speechSynthesis.speak(utterance);
-  };
+  const { speak } = useTTS({
+    enabledRef: isConversationModeRef,
+    onEnd: () => restartListeningAfterSpeech(),
+    setIsSpeaking,
+  });
 
   // Helper to restart listening after speech ends
   const restartListeningAfterSpeech = () => {
     if (isConversationModeRef.current && recognitionRef.current) {
       setTimeout(() => {
-        
         finalTranscriptRef.current = "";
         currentInterimRef.current = "";
         setInterimTranscript("");
@@ -491,7 +439,6 @@ export function PDFChat({
   // Toggle voice conversation mode
   const toggleVoiceMode = async () => {
     const newState = !isConversationMode;
-    
 
     setIsConversationMode(newState);
     setIsSpeechEnabled(newState);
@@ -505,9 +452,6 @@ export function PDFChat({
 
       initializeSpeechRecognition();
 
-      // Using browser TTS - no additional setup needed
-      
-
       toast.success("🎤 Voice mode enabled - Start speaking!");
 
       // Start listening automatically
@@ -515,7 +459,6 @@ export function PDFChat({
         if (recognitionRef.current) {
           try {
             recognitionRef.current.start();
-            
           } catch (e) {
             console.error("Failed to start recognition:", e);
             toast.error("Failed to start voice recognition");
@@ -562,8 +505,12 @@ export function PDFChat({
       {/* Header */}
       <div className="px-4 h-14 flex items-center border-b border-gray-200 bg-gray-50">
         <div>
-          <h3 className="font-semibold text-gray-900 leading-tight">AI Assistant</h3>
-          <p className="text-xs text-gray-500">Ask questions about this document</p>
+          <h3 className="font-semibold text-gray-900 leading-tight">
+            AI Assistant
+          </h3>
+          <p className="text-xs text-gray-500">
+            Ask questions about this document
+          </p>
         </div>
       </div>
 
@@ -588,7 +535,11 @@ export function PDFChat({
         ) : null}
 
         {messages.map((message) => (
-          <MessageBubble key={message.id} isUser={message.isUser} text={message.text} />
+          <MessageBubble
+            key={message.id}
+            isUser={message.isUser}
+            text={message.text}
+          />
         ))}
 
         {isLoading && <TypingDots />}
@@ -639,14 +590,6 @@ export function PDFChat({
             )}
           </Button>
 
-          {/* Listening indicator for conversation mode */}
-          {/* {isConversationMode && isListening && (
-            <div className="flex items-center px-4 py-1 h-10 bg-green-100 rounded-lg">
-              <AudioWaveform className="h-4 w-4 text-green-500 animate-pulse" />
-            </div>
-          )} */}
-
-          {/* Speaking Indicator */}
           {isSpeaking && (
             <div className="flex items-center px-3 py-2 bg-blue-100 rounded-lg">
               <div className="flex space-x-1">

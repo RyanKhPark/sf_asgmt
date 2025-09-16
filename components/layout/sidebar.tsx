@@ -22,7 +22,7 @@ import {
 const menuItems = [
   {
     label: "History",
-    href: "/history",
+    href: "#",
     icon: BookOpen,
   },
 ];

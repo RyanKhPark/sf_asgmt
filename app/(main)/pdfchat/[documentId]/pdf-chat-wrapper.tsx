@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useCallback } from "react";
-import { PDFViewerAdvanced } from "@/components/pdf/pdf-viewer-advanced";
+import { PDFViewerAdvanced } from "@/components/pdf/pdf-viewer";
 import { PDFChat } from "@/components/pdf/pdf-chat";
 import { toast } from "sonner";
 
@@ -37,7 +37,6 @@ export function PDFChatWrapper({ document }: PDFChatWrapperProps) {
 
   const handleHighlightCreated = useCallback(
     async (highlight: Highlight) => {
-      
       setManualHighlights((prev) => [...prev, highlight]);
 
       // Store highlight in database
@@ -77,7 +76,6 @@ export function PDFChatWrapper({ document }: PDFChatWrapperProps) {
   );
 
   const handleAIHighlight = useCallback((phrases: string[]) => {
-    
     setAiHighlightPhrases(phrases);
   }, []);
 
@@ -87,9 +85,7 @@ export function PDFChatWrapper({ document }: PDFChatWrapperProps) {
     setExternalNotice(message + " (This was checked against the current PDF.)");
   }, []);
 
-  const handleDocumentLoad = useCallback((numPages: number) => {
-    
-  }, []);
+  const handleDocumentLoad = useCallback((numPages: number) => {}, []);
 
   const handleError = useCallback((error: string) => {
     console.error("PDF Error:", error);
