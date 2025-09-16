@@ -112,8 +112,8 @@ export default function HomeSidebar() {
                     if (session) {
                       window.location.href = item.href;
                     } else {
-                      // Redirect signed-out users to home
-                      window.location.href = "/";
+                      // Show auth modal when logged out
+                      setShowAuthModal(true);
                     }
                   }}
                   className={cn(
