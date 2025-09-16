@@ -10,7 +10,7 @@ import {
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { usePathname } from "next/navigation";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useSession, signOut } from "next-auth/react";
 import { AuthModal } from "@/components/auth/auth-modal";
 import { sidebarTextAnimation, sidebarIconAnimation, sidebarAvatarAnimation } from "@/lib/sidebar-animations";
@@ -28,6 +28,8 @@ export default function HomeSidebar() {
   const [isCollapsed, setIsCollapsed] = useState(false);
   const [showAuthModal, setShowAuthModal] = useState(false);
   const { data: session } = useSession();
+  const [recentDocs, setRecentDocs] = useState<Array<{ id: string; title: string; uploadedAt: string; processingStatus: string | null; totalPages: number | null }>>([]);
+  const [loadingDocs, setLoadingDocs] = useState(false);
 
   const toggleSidebar = () => {
     setIsCollapsed(!isCollapsed);
@@ -40,6 +42,31 @@ export default function HomeSidebar() {
       setShowAuthModal(true);
     }
   };
+
+  // Load recent documents for logged-in users
+  useEffect(() => {
+    const loadRecent = async () => {
+      if (!session?.user?.id) {
+        setRecentDocs([]);
+        return;
+      }
+      setLoadingDocs(true);
+      try {
+        const res = await fetch("/api/documents?limit=5");
+        if (res.ok) {
+          const data = await res.json();
+          setRecentDocs(data.documents || []);
+        } else {
+          setRecentDocs([]);
+        }
+      } catch (e) {
+        setRecentDocs([]);
+      } finally {
+        setLoadingDocs(false);
+      }
+    };
+    loadRecent();
+  }, [session?.user?.id]);
 
   return (
     <div
@@ -85,7 +112,8 @@ export default function HomeSidebar() {
                     if (session) {
                       window.location.href = item.href;
                     } else {
-                      setShowAuthModal(true);
+                      // Redirect signed-out users to home
+                      window.location.href = "/";
                     }
                   }}
                   className={cn(
@@ -126,6 +154,35 @@ export default function HomeSidebar() {
               )}
             </li>
           ))}
+          {session && (
+            <li className="mt-4">
+              <div className="text-xs uppercase tracking-wide text-muted-foreground px-3 mb-2">
+                Recent PDFs
+              </div>
+              {loadingDocs ? (
+                <div className="px-3 py-1 text-xs text-muted-foreground">Loading…</div>
+              ) : recentDocs.length === 0 ? (
+                <div className="px-3 py-1 text-sm text-muted-foreground">Try your first!.</div>
+              ) : (
+                <ul className="space-y-1">
+                  {recentDocs.map((doc, idx) => (
+                    <li key={doc.id}>
+                      <Link
+                        href={`/pdfchat/${doc.id}`}
+                        className={cn(
+                          "w-full flex items-center px-3 py-2 rounded-md hover:bg-sidebar-accent transition-colors text-left min-w-0",
+                          pathname === `/pdfchat/${doc.id}` && "bg-sidebar-accent"
+                        )}
+                        title={doc.title}
+                      >
+                        <span className="text-sm truncate max-w-full">{idx === 0 ? `• ${doc.title}` : doc.title}</span>
+                      </Link>
+                    </li>
+                  ))}
+                </ul>
+              )}
+            </li>
+          )}
         </ul>
       </nav>
 

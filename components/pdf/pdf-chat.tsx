@@ -4,6 +4,8 @@ import { useState, useRef, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { Send, Mic, MicOff, Waves, AudioWaveform } from "lucide-react";
 import { toast } from "sonner";
+import { MessageBubble } from "@/components/chat/message-bubble";
+import { TypingDots } from "@/components/chat/typing-dots";
 // Using browser TTS for voice synthesis
 
 // Type definitions for Web Speech API
@@ -622,37 +624,10 @@ export function PDFChat({
         ) : null}
 
         {messages.map((message) => (
-          <div
-            key={message.id}
-            className={`flex ${
-              message.isUser ? "justify-end" : "justify-start"
-            }`}
-          >
-            <div
-              className={`max-w-[80%] px-4 py-2 rounded-lg ${
-                message.isUser
-                  ? "bg-blue-500 text-white"
-                  : "bg-gray-100 text-gray-900"
-              }`}
-            >
-              <p className="whitespace-pre-wrap">{message.text}</p>
-            </div>
-          </div>
+          <MessageBubble key={message.id} isUser={message.isUser} text={message.text} />
         ))}
 
-        {isLoading && (
-          <div className="flex justify-start">
-            <div className="bg-gray-100 px-4 py-2 rounded-lg flex items-center space-x-2">
-              <div className="flex items-center space-x-1">
-                <div className="flex space-x-1">
-                  <div className="w-1 h-1 bg-gray-500 rounded-full animate-bounce [animation-delay:0ms]"></div>
-                  <div className="w-1 h-1 bg-gray-500 rounded-full animate-bounce [animation-delay:150ms]"></div>
-                  <div className="w-1 h-1 bg-gray-500 rounded-full animate-bounce [animation-delay:300ms]"></div>
-                </div>
-              </div>
-            </div>
-          </div>
-        )}
+        {isLoading && <TypingDots />}
 
         <div ref={messagesEndRef} />
       </div>

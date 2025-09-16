@@ -1,4 +1,4 @@
-import { notFound } from "next/navigation";
+import { redirect, notFound } from "next/navigation";
 import { auth } from "@/auth";
 import { db } from "@/lib/db";
 import { PDFChatWrapper } from "./pdf-chat-wrapper";
@@ -12,7 +12,7 @@ interface PDFChatPageProps {
 export default async function PDFChatPage({ params }: PDFChatPageProps) {
   const session = await auth();
   if (!session?.user?.id) {
-    notFound();
+    redirect("/");
   }
 
   const document = await db.document.findFirst({
@@ -23,7 +23,7 @@ export default async function PDFChatPage({ params }: PDFChatPageProps) {
   });
 
   if (!document || !document.fileUrl) {
-    notFound();
+    redirect("/");
   }
 
   return (
