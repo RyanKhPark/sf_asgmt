@@ -2,12 +2,13 @@
 
 import { useRef, useEffect, useState, useCallback } from "react";
 import { HighlightLayer } from "./highlight-layer";
-import {
-  normalizeText,
-  toWords,
-  sentenceSplit,
-  jaccard,
-} from "@/lib/pdf-text-utils";
+// Text utility functions are available but not currently used
+// import {
+//   normalizeText,
+//   toWords,
+//   sentenceSplit,
+//   jaccard,
+// } from "@/lib/pdf-text-utils";
 import { useImageRects } from "@/hooks/use-image-rects";
 import { useAnnotations } from "@/hooks/use-annotations";
 import { useAiHighlights } from "@/hooks/use-ai-highlights";
@@ -80,6 +81,7 @@ export function PDFViewerAdvanced({
   onTextSelected,
   onHighlightCreated,
   aiHighlightPhrases = [],
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
   activeMessageId,
   aiTopK = 3,
   aiMinScore = 0.15,
@@ -99,6 +101,7 @@ export function PDFViewerAdvanced({
   const visiblePagesRef = useRef(new Set<number>());
   const { interceptDrawImage, getRects } = useImageRects();
   const { loadExisting } = useAnnotations();
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
   const circledPagesRef = useRef(new Set<number>());
 
   // Load PDF.js library
@@ -291,7 +294,7 @@ export function PDFViewerAdvanced({
         renderingPages.current.delete(pageIndex);
       }
     },
-    [pdfDocument, scale]
+    [pdfDocument, scale, interceptDrawImage]
   );
 
   // Trigger initial page render
@@ -390,7 +393,7 @@ export function PDFViewerAdvanced({
 
     // Load immediately; overlay rendering does not depend on canvas/text layer
     loadExistingHighlights();
-  }, [pdfDocument, documentId, highlightsLoaded, pages.length]);
+  }, [pdfDocument, documentId, highlightsLoaded, pages.length, loadExisting]);
 
   useAiHighlights({
     pdfDocument,

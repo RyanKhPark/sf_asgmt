@@ -2,7 +2,7 @@
 
 import { useState, useRef, useEffect } from "react";
 import { Button } from "@/components/ui/button";
-import { Send, Mic, MicOff, Waves, AudioWaveform } from "lucide-react";
+import { Send, Mic, MicOff } from "lucide-react";
 import { toast } from "sonner";
 import { useTTS } from "@/hooks/use-tts";
 import { MessageBubble } from "@/components/chat/message-bubble";
@@ -37,12 +37,12 @@ interface SpeechRecognition extends EventTarget {
   continuous: boolean;
   interimResults: boolean;
   lang: string;
-  onstart: ((this: SpeechRecognition, ev: Event) => any) | null;
+  onstart: ((this: SpeechRecognition, ev: Event) => void) | null;
   onresult:
-    | ((this: SpeechRecognition, ev: SpeechRecognitionEvent) => any)
+    | ((this: SpeechRecognition, ev: SpeechRecognitionEvent) => void)
     | null;
-  onerror: ((this: SpeechRecognition, ev: Event) => any) | null;
-  onend: ((this: SpeechRecognition, ev: Event) => any) | null;
+  onerror: ((this: SpeechRecognition, ev: Event) => void) | null;
+  onend: ((this: SpeechRecognition, ev: Event) => void) | null;
   start(): void;
   stop(): void;
   abort(): void;
@@ -238,19 +238,35 @@ export function PDFChat({
   const initializeSpeechRecognition = () => {
     if (typeof window === "undefined") return;
 
-    const SpeechRecognition =
-      (window as any).SpeechRecognition ||
-      (window as any).webkitSpeechRecognition;
-    if (!SpeechRecognition) {
+    const SpeechRecognitionConstructor =
+      (
+        window as Window &
+          typeof globalThis & {
+            SpeechRecognition?: new () => SpeechRecognition;
+            webkitSpeechRecognition?: new () => SpeechRecognition;
+          }
+      ).SpeechRecognition ||
+      (
+        window as Window &
+          typeof globalThis & {
+            SpeechRecognition?: new () => SpeechRecognition;
+            webkitSpeechRecognition?: new () => SpeechRecognition;
+          }
+      ).webkitSpeechRecognition;
+    if (!SpeechRecognitionConstructor) {
       toast.error("Speech recognition not supported in this browser");
       return;
     }
 
-    const recognition = new SpeechRecognition();
+    const recognition = new SpeechRecognitionConstructor();
     recognition.continuous = true;
     recognition.interimResults = true;
     recognition.lang = "en-US";
-    recognition.maxAlternatives = 1;
+    try {
+      (
+        recognition as SpeechRecognition & { maxAlternatives?: number }
+      ).maxAlternatives = 1;
+    } catch {}
 
     recognition.onstart = () => {
       setIsListening(true);
@@ -259,7 +275,7 @@ export function PDFChat({
       currentInterimRef.current = "";
     };
 
-    recognition.onresult = (event: any) => {
+    recognition.onresult = (event: SpeechRecognitionEvent) => {
       let interimTranscript = "";
       let finalTranscript = "";
 
@@ -331,10 +347,11 @@ export function PDFChat({
       }
     };
 
-    recognition.onerror = (event: any) => {
-      console.error("Speech recognition error:", event.error);
-      if (event.error !== "no-speech") {
-        toast.error("Speech recognition error: " + event.error);
+    recognition.onerror = (event: Event) => {
+      const errorEvent = event as Event & { error?: string };
+      console.error("Speech recognition error:", errorEvent.error);
+      if (errorEvent.error && errorEvent.error !== "no-speech") {
+        toast.error("Speech recognition error: " + errorEvent.error);
       }
       setIsListening(false);
       setInterimTranscript("");
@@ -489,7 +506,8 @@ export function PDFChat({
     }
   };
 
-  // Start/stop listening
+  // Start/stop listening (unused but kept for potential future use)
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
   const toggleListening = () => {
     if (!isSpeechEnabled) return;
 

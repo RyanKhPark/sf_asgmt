@@ -17,8 +17,10 @@ export function sentenceSplit(s: string): string[] {
 }
 
 export function jaccard(aSet: Set<string>, bSet: Set<string>): number {
-  const inter = new Set([...aSet].filter((x) => bSet.has(x))).size;
-  const uni = new Set([...aSet, ...bSet]).size || 1;
+  const aArray = Array.from(aSet);
+  const bArray = Array.from(bSet);
+  const inter = new Set(aArray.filter((x) => bSet.has(x))).size;
+  const uni = new Set([...aArray, ...bArray]).size || 1;
   return inter / uni;
 }
 

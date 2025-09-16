@@ -71,7 +71,8 @@ export default function HomeSidebar() {
         } else {
           setRecentDocs([]);
         }
-      } catch (e) {
+      } catch (error) {
+        console.error("Failed to load recent documents:", error);
         setRecentDocs([]);
       } finally {
         setLoadingDocs(false);

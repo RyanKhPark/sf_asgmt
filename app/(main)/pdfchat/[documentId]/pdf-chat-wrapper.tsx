@@ -4,20 +4,7 @@ import { useState, useCallback } from "react";
 import { PDFViewerAdvanced } from "@/components/pdf/pdf-viewer";
 import { PDFChat } from "@/components/pdf/pdf-chat";
 import { toast } from "sonner";
-
-interface Highlight {
-  id: string;
-  pageNumber: number;
-  text: string;
-  rects: Array<{
-    x: number;
-    y: number;
-    width: number;
-    height: number;
-  }>;
-  color: string;
-  type: "manual" | "ai";
-}
+import type { Highlight } from "@/types/pdf";
 
 interface PDFChatWrapperProps {
   document: {
@@ -58,7 +45,7 @@ export function PDFChatWrapper({ document }: PDFChatWrapperProps) {
             y: highlight.rects[0]?.y || 0,
             width: highlight.rects[0]?.width || 100,
             height: highlight.rects[0]?.height || 20,
-            color: highlight.shape === "circle" ? "#ff0000" : highlight.color,
+            color: highlight.color,
             createdBy: highlight.type === "manual" ? "user" : "ai",
             messageId: activeMessageId || undefined,
           }),
@@ -85,7 +72,7 @@ export function PDFChatWrapper({ document }: PDFChatWrapperProps) {
     setExternalNotice(message + " (This was checked against the current PDF.)");
   }, []);
 
-  const handleDocumentLoad = useCallback((numPages: number) => {}, []);
+  const handleDocumentLoad = useCallback(() => {}, []);
 
   const handleError = useCallback((error: string) => {
     console.error("PDF Error:", error);
