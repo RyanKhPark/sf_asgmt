@@ -91,8 +91,7 @@ export function PDFViewerAdvanced({
   const [pdfDocument, setPdfDocument] = useState<PDFDocumentProxy | null>(null);
   const [pages, setPages] = useState<PDFPage[]>([]);
   const [highlights, setHighlights] = useState<Highlight[]>([]);
-  const [isSelecting, setIsSelecting] = useState(false);
-  const [selectedText, setSelectedText] = useState("");
+  // Removed manual selection state
   const [scale] = useState(1);
   const renderingPages = useRef(new Set<number>());
   const renderedPages = useRef(new Set<number>());
@@ -458,9 +457,6 @@ export function PDFViewerAdvanced({
         range.selectNodeContents(foundSpan);
         selection.addRange(range);
 
-        // Set selected text state
-        setSelectedText(searchText);
-
         // Trigger the existing text selection handler
         onTextSelected?.(searchText, pageNumber);
 
@@ -495,25 +491,16 @@ export function PDFViewerAdvanced({
             }
 
             if (saveToDatabase) {
-              if (type === "manual") {
-                // Use the existing manual flow to keep behavior consistent
-                const highlightButton = document.querySelector('button[title="Highlight Yellow"]') as HTMLButtonElement;
-                if (highlightButton) {
-                  highlightButton.click(); // Trigger the existing highlight creation (manual)
-                }
-              } else {
-                // Directly create an AI highlight with computed rects
-                const highlight: Highlight = {
-                  id: `ai-highlight-${Date.now()}-${pageNumber}`,
-                  pageNumber,
-                  text: searchText,
-                  rects: pageRelativeRects.length > 0 ? pageRelativeRects : [{ x: 50, y: 150, width: 400, height: 25 }],
-                  color: "#ffff00",
-                  type: "ai",
-                };
-                setHighlights((prev) => [...prev, highlight]);
-                onHighlightCreated?.(highlight);
-              }
+              const highlight: Highlight = {
+                id: `${type}-highlight-${Date.now()}-${pageNumber}`,
+                pageNumber,
+                text: searchText,
+                rects: pageRelativeRects.length > 0 ? pageRelativeRects : [{ x: 50, y: 150, width: 400, height: 25 }],
+                color: "#ffff00",
+                type,
+              };
+              setHighlights((prev) => [...prev, highlight]);
+              onHighlightCreated?.(highlight);
             } else {
               // Visual only (restoring)
               const highlight: Highlight = {
@@ -531,16 +518,15 @@ export function PDFViewerAdvanced({
 
           console.log(`📊 Current highlights count: ${highlights.length}`);
           selection.removeAllRanges(); // Clear selection after highlighting
-          setSelectedText(""); // Clear selected text
         }, 200);
       }
     } else {
       console.log(`❌ Could not find matching text span for: "${normalizedSearch}"`);
       throw new Error("Text not found in spans");
     }
-  }, [onTextSelected, setSelectedText, highlights.length, setHighlights, onHighlightCreated]);
+  }, [onTextSelected, highlights.length, setHighlights, onHighlightCreated]);
 
-  // Fallback function to create manual highlight
+  // Fallback function to create manual highlight (used programmatically)
   const createManualHighlight = useCallback((pageNumber: number, text: string) => {
     console.log(`🎯 Creating manual highlight on page ${pageNumber}: "${text}"`);
 
@@ -562,101 +548,7 @@ export function PDFViewerAdvanced({
     }
   }, [onHighlightCreated]);
 
-  const handleTextSelection = useCallback(() => {
-    const selection = window.getSelection();
-    if (!selection || selection.rangeCount === 0) return;
-
-    const text = selection.toString().trim();
-    if (text.length > 0) {
-      setSelectedText(text);
-
-      // Find which page the selection is on
-      const range = selection.getRangeAt(0);
-      const container = range.commonAncestorContainer;
-      const pageElement =
-        (container as Node).nodeType === Node.TEXT_NODE
-          ? (container as Node).parentElement?.closest(".pdf-page-container")
-          : (container as Element).closest(".pdf-page-container");
-
-      if (pageElement) {
-        const pageNumber =
-          parseInt(pageElement.getAttribute("data-page-index") || "0") + 1;
-        onTextSelected?.(text, pageNumber);
-      }
-    }
-  }, [onTextSelected]);
-
-  // Mouse event handlers for text selection
-  useEffect(() => {
-    const handleMouseUp = () => {
-      if (isSelecting) {
-        handleTextSelection();
-        setIsSelecting(false);
-      }
-    };
-
-    const handleMouseDown = () => {
-      setIsSelecting(true);
-      setSelectedText("");
-    };
-
-    document.addEventListener("mouseup", handleMouseUp);
-    document.addEventListener("mousedown", handleMouseDown);
-
-    return () => {
-      document.removeEventListener("mouseup", handleMouseUp);
-      document.removeEventListener("mousedown", handleMouseDown);
-    };
-  }, [isSelecting, handleTextSelection]);
-
-  // Create manual highlight from selection
-  const createHighlight = useCallback(
-    (color: string = "#ffff00") => {
-      const selection = window.getSelection();
-      if (!selection || selection.rangeCount === 0 || !selectedText) return;
-
-      const range = selection.getRangeAt(0);
-      const rects = range.getClientRects();
-
-      // Find page number
-      const container = range.commonAncestorContainer;
-      const pageElement =
-        (container as Node).nodeType === Node.TEXT_NODE
-          ? (container as Node).parentElement?.closest(".pdf-page-container")
-          : (container as Element).closest(".pdf-page-container");
-
-      if (!pageElement) return;
-
-      const pageNumber =
-        parseInt(pageElement.getAttribute("data-page-index") || "0") + 1;
-      const pageRect = pageElement.getBoundingClientRect();
-
-      // Convert client rects to page-relative coordinates
-      const highlightRects = Array.from(rects).map((rect) => ({
-        x: rect.left - pageRect.left,
-        y: rect.top - pageRect.top,
-        width: rect.width,
-        height: rect.height,
-      }));
-
-      const highlight: Highlight = {
-        id: `highlight-${Date.now()}`,
-        pageNumber,
-        text: selectedText,
-        rects: highlightRects,
-        color,
-        type: "manual",
-      };
-
-      setHighlights((prev) => [...prev, highlight]);
-      onHighlightCreated?.(highlight);
-
-      // Clear selection
-      selection.removeAllRanges();
-      setSelectedText("");
-    },
-    [selectedText, onHighlightCreated]
-  );
+  // Removed manual selection handlers and selection-to-highlight UI
 
   // Load existing highlights from database when PDF loads
   const [highlightsLoaded, setHighlightsLoaded] = useState(false);
@@ -669,41 +561,40 @@ export function PDFViewerAdvanced({
         console.log(`📂 Loading existing highlights for document: ${documentId}`);
         const response = await fetch(`/api/annotations?documentId=${documentId}`);
 
-        if (response.ok) {
-          const data = await response.json();
-          const annotations = data.annotations || [];
-
-          console.log(`📊 Found ${annotations.length} existing annotations`);
-
-          // Use existing selectAndHighlightText function to restore highlights
-          for (const annotation of annotations) {
-            if (annotation.highlightText && annotation.pageNumber) {
-              console.log(`🔍 Restoring highlight on page ${annotation.pageNumber}: "${annotation.highlightText}"`);
-
-              // Use the existing text selection system with a longer delay to ensure text layers are rendered
-              setTimeout(() => {
-                selectAndHighlightText(
-                  annotation.pageNumber,
-                  annotation.highlightText,
-                  { saveToDatabase: false }
-                );
-              }, 3000 + (annotation.pageNumber * 500)); // Longer delays for text layer rendering
-            }
-          }
-
-          console.log(`✅ Queued ${annotations.length} highlights for restoration using text selection`);
-
-          setHighlightsLoaded(true); // Prevent re-loading
+        if (!response.ok) {
+          setHighlightsLoaded(true);
+          return;
         }
+
+        const data = await response.json();
+        const annotations = data.annotations || [];
+
+        console.log(`📊 Found ${annotations.length} existing annotations`);
+
+        // Map stored coordinates directly to highlight overlays (fast path)
+        const mapped = annotations
+          .filter((a: any) => typeof a.pageNumber === 'number')
+          .map((a: any) => ({
+            id: `ann-${a.id}`,
+            pageNumber: a.pageNumber as number,
+            text: a.highlightText as string,
+            rects: [{ x: a.x || 0, y: a.y || 0, width: a.width || 0, height: a.height || 0 }],
+            color: a.color || '#ffff00',
+            type: a.createdBy === 'ai' ? 'ai' as const : 'manual' as const,
+          }));
+
+        setHighlights((prev) => [...prev, ...mapped]);
+        setHighlightsLoaded(true);
+        console.log(`✅ Rendered ${mapped.length} stored highlights immediately`);
       } catch (error) {
         console.error("Failed to load existing highlights:", error);
-        setHighlightsLoaded(true); // Prevent infinite retries
+        setHighlightsLoaded(true);
       }
     };
 
-    // Wait for pages to be rendered before loading highlights
-    setTimeout(loadExistingHighlights, 2000);
-  }, [pdfDocument, documentId, highlightsLoaded, pages.length, selectAndHighlightText]);
+    // Load immediately; overlay rendering does not depend on canvas/text layer
+    loadExistingHighlights();
+  }, [pdfDocument, documentId, highlightsLoaded, pages.length]);
 
   // Process AI highlight phrases using AI analysis
   // Guard against unnecessary reprocessing using a content signature
