@@ -3,6 +3,9 @@
 import { useRef, useEffect, useState, useCallback } from "react";
 import { HighlightLayer } from "./highlight-layer";
 import { normalizeText, toWords, sentenceSplit, jaccard } from "@/lib/pdf-text-utils";
+import { useImageRects } from "@/hooks/use-image-rects";
+import { useAnnotations } from "@/hooks/use-annotations";
+import type { Highlight } from "@/types/pdf";
 import { Loader2 } from "lucide-react";
 
 interface PDFViewport {
@@ -45,22 +48,7 @@ interface PDFPage {
   rendered: boolean;
 }
 
-interface Highlight {
-  id: string;
-  pageNumber: number;
-  text: string;
-  rects: Array<{
-    x: number;
-    y: number;
-    width: number;
-    height: number;
-  }>;
-  color: string;
-  type: "manual" | "ai" | "image";
-  shape?: "rect" | "circle";
-  strokeColor?: string;
-  strokeWidth?: number;
-}
+// Highlight type imported from @/types/pdf
 
 interface PDFViewerAdvancedProps {
   fileUrl: string;
@@ -99,7 +87,8 @@ export function PDFViewerAdvanced({
   const renderingPages = useRef(new Set<number>());
   const renderedPages = useRef(new Set<number>());
   const visiblePagesRef = useRef(new Set<number>());
-  const imageRectsRef = useRef<Record<number, Array<{ x: number; y: number; width: number; height: number }>>>({});
+  const { interceptDrawImage, getRects } = useImageRects();
+  const { loadExisting } = useAnnotations();
   const circledPagesRef = useRef(new Set<number>());
 
   // Load PDF.js library
@@ -235,48 +224,8 @@ export function PDFViewerAdvanced({
           viewport: viewport,
         };
 
-        // Intercept drawImage to capture image rectangles
-        const originalDrawImage = (context as any).drawImage?.bind(context);
-        (context as any).drawImage = function (...args: any[]) {
-          try {
-            // drawImage(img, dx, dy)
-            // drawImage(img, dx, dy, dw, dh)
-            // drawImage(img, sx, sy, sw, sh, dx, dy, dw, dh)
-            let dx = 0, dy = 0, dw = 0, dh = 0;
-            if (args.length === 3) {
-              dx = args[1]; dy = args[2];
-              dw = (args[0]?.width) || 0; dh = (args[0]?.height) || 0;
-            } else if (args.length === 5) {
-              dx = args[1]; dy = args[2]; dw = args[3]; dh = args[4];
-            } else if (args.length === 9) {
-              dx = args[5]; dy = args[6]; dw = args[7]; dh = args[8];
-            }
-            if (!imageRectsRef.current[pageIndex + 1]) imageRectsRef.current[pageIndex + 1] = [];
-            if (dw > 1 && dh > 1) {
-              // Transform rect by current context transform to device space
-              const t = (context as CanvasRenderingContext2D).getTransform();
-              const pts = [
-                { x: dx, y: dy },
-                { x: dx + dw, y: dy },
-                { x: dx, y: dy + dh },
-                { x: dx + dw, y: dy + dh },
-              ].map(p => ({
-                x: t.a * p.x + t.c * p.y + t.e,
-                y: t.b * p.x + t.d * p.y + t.f,
-              }));
-              const xs = pts.map(p => p.x);
-              const ys = pts.map(p => p.y);
-              const minX = Math.min(...xs);
-              const maxX = Math.max(...xs);
-              const minY = Math.min(...ys);
-              const maxY = Math.max(...ys);
-              const rect = { x: minX, y: minY, width: maxX - minX, height: maxY - minY };
-              imageRectsRef.current[pageIndex + 1].push(rect);
-            }
-          } catch {}
-          return originalDrawImage?.(...args);
-        };
-
+        // Intercept drawImage to capture image rectangles via hook
+        const restore = interceptDrawImage(context, pageIndex + 1);
         const renderTask = page.render(renderContext);
         await renderTask.promise;
 
@@ -285,14 +234,11 @@ export function PDFViewerAdvanced({
         // Double check canvas actually has content
         
 
-        // Restore drawImage just in case
-        if (originalDrawImage) {
-          (context as any).drawImage = originalDrawImage;
-        }
+        // Restore drawImage
+        if (restore) restore();
 
         // Mark as rendered
         renderedPages.current.add(pageIndex);
-        const captured = imageRectsRef.current[pageIndex + 1]?.length || 0;
         
 
         // Create text layer for selection
@@ -602,40 +548,9 @@ export function PDFViewerAdvanced({
 
     const loadExistingHighlights = async () => {
       try {
-        
-        const response = await fetch(`/api/annotations?documentId=${documentId}`);
-
-        if (!response.ok) {
-          setHighlightsLoaded(true);
-          return;
-        }
-
-        const data = await response.json();
-        const annotations = data.annotations || [];
-
-        
-
-        // Map stored coordinates directly to highlight overlays (fast path)
-        const mapped = annotations
-          .filter((a: any) => typeof a.pageNumber === 'number')
-          .map((a: any) => ({
-            id: `ann-${a.id}`,
-            pageNumber: a.pageNumber as number,
-            text: a.highlightText as string,
-            rects: [{ x: a.x ?? 0, y: a.y ?? 0, width: a.width ?? 0, height: a.height ?? 0 }],
-            color: a.color || (a.type === 'image_highlight' ? '#ff0000' : '#ffff00'),
-            type: a.type === 'image_highlight' ? 'image' as const : (a.createdBy === 'ai' ? 'ai' as const : 'manual' as const),
-            shape: a.type === 'image_highlight' ? 'circle' as const : 'rect' as const,
-            strokeColor: a.type === 'image_highlight' ? '#ff0000' : undefined,
-            strokeWidth: a.type === 'image_highlight' ? 2 : undefined,
-          }));
-        const valid = mapped.map(m => ({
-          ...m,
-          rects: m.rects.filter(r => r.width > 1 && r.height > 1),
-        })).filter(m => m.rects.length > 0);
-        setHighlights((prev) => [...prev, ...valid]);
+        const mapped = await loadExisting(documentId);
+        if (mapped.length > 0) setHighlights((prev) => [...prev, ...mapped]);
         setHighlightsLoaded(true);
-        
       } catch (error) {
         console.error("Failed to load existing highlights:", error);
         setHighlightsLoaded(true);
@@ -731,7 +646,7 @@ export function PDFViewerAdvanced({
 
             // Additionally, try to circle the most relevant image on the page (once per page)
             if (i === 0 && !circledPagesRef.current.has(page)) {
-              const rects = imageRectsRef.current[page] || [];
+            const rects = getRects(page) || [];
               if (rects.length > 0) {
                 // Gate on keywords or "massive" image size
                 const keywordRe = /(fig(?:ure)?\.?|image|diagram|chart|graph|table|photo|picture)/i;
@@ -824,7 +739,7 @@ export function PDFViewerAdvanced({
             const figPage = findPageForFigure(figNum);
             if (figPage && !circledPagesRef.current.has(figPage)) {
               try { await renderPage(figPage - 1); } catch {}
-              const rects = imageRectsRef.current[figPage] || [];
+              const rects = getRects(figPage) || [];
               if (rects.length > 0) {
                 const chosen = rects.reduce((a, b) => (a.width * a.height >= b.width * b.height ? a : b));
                 const imageHighlight: Highlight = {
