@@ -192,8 +192,6 @@ Voice functionality uses browser-native APIs:
 - **Speech Recognition**: Web Speech API
 - **Text-to-Speech**: Speech Synthesis API
 
-No additional configuration required - works in modern browsers.
-
 ### File Storage
 Uses Vercel Blob for file storage. Set up your `BLOB_READ_WRITE_TOKEN` in the environment variables.
 
@@ -209,38 +207,4 @@ Uses Vercel Blob for file storage. Set up your `BLOB_READ_WRITE_TOKEN` in the en
 1. Build the application: `npm run build`
 2. Set up PostgreSQL database
 3. Configure environment variables
-4. Run: `npm start`
-
-## 🤝 Contributing
-
-1. Fork the repository
-2. Create a feature branch: `git checkout -b feature-name`
-3. Commit changes: `git commit -m 'Add feature'`
-4. Push to branch: `git push origin feature-name`
-5. Submit a pull request
-
-## 📄 License
-
-This project is developed as part of a technical assignment.
-
-## 🆘 Troubleshooting
-
-### Common Issues
-
-**Voice mode not working**
-- Ensure you're using HTTPS or localhost
-- Check browser permissions for microphone access
-- Verify browser supports Web Speech API
-
-**PDF upload failing**
-- Check file size limits
-- Verify Vercel Blob configuration
-- Ensure proper file permissions
-
-**Database connection issues**
-- Verify PostgreSQL is running
-- Check DATABASE_URL format
-- Run `npm run db:push` to sync schema
-
-### Support
-For technical issues or questions, please refer to the project documentation or create an issue in the repository.
+4. Run: `npm run dev`
