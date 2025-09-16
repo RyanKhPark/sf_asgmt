@@ -74,7 +74,7 @@ export async function POST(request: NextRequest) {
       access: "public",
     });
 
-    console.log("📁 File uploaded to blob:", blob.url);
+    
 
     // Save document metadata to database
     const document = await db.document.create({
@@ -88,7 +88,7 @@ export async function POST(request: NextRequest) {
       },
     });
 
-    console.log("✅ Document saved to database:", document.id);
+    
 
     return NextResponse.json({
       success: true,
@@ -118,7 +118,7 @@ export async function PUT(request: NextRequest) {
     const { url, pathname } = await request.json();
 
     // You can update document status here if needed
-    console.log("Upload callback:", { url, pathname });
+    
 
     return NextResponse.json({ success: true });
   } catch (error) {

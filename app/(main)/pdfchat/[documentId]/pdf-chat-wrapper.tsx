@@ -37,7 +37,7 @@ export function PDFChatWrapper({ document }: PDFChatWrapperProps) {
 
   const handleHighlightCreated = useCallback(
     async (highlight: Highlight) => {
-      console.log("New highlight created:", highlight);
+      
       setManualHighlights((prev) => [...prev, highlight]);
 
       // Store highlight in database
@@ -47,14 +47,19 @@ export function PDFChatWrapper({ document }: PDFChatWrapperProps) {
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
             documentId: document.id,
-            type: highlight.type === "manual" ? "highlight" : "ai_highlight",
+            type:
+              highlight.shape === "circle"
+                ? "image_highlight"
+                : highlight.type === "manual"
+                ? "highlight"
+                : "ai_highlight",
             highlightText: highlight.text,
             pageNumber: highlight.pageNumber,
             x: highlight.rects[0]?.x || 0,
             y: highlight.rects[0]?.y || 0,
             width: highlight.rects[0]?.width || 100,
             height: highlight.rects[0]?.height || 20,
-            color: highlight.color,
+            color: highlight.shape === "circle" ? "#ff0000" : highlight.color,
             createdBy: highlight.type === "manual" ? "user" : "ai",
             messageId: activeMessageId || undefined,
           }),
@@ -72,7 +77,7 @@ export function PDFChatWrapper({ document }: PDFChatWrapperProps) {
   );
 
   const handleAIHighlight = useCallback((phrases: string[]) => {
-    console.log("AI highlighting phrases:", phrases);
+    
     setAiHighlightPhrases(phrases);
   }, []);
 
@@ -83,7 +88,7 @@ export function PDFChatWrapper({ document }: PDFChatWrapperProps) {
   }, []);
 
   const handleDocumentLoad = useCallback((numPages: number) => {
-    console.log(`Document loaded with ${numPages} pages`);
+    
   }, []);
 
   const handleError = useCallback((error: string) => {

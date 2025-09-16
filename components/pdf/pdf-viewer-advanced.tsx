@@ -56,7 +56,10 @@ interface Highlight {
     height: number;
   }>;
   color: string;
-  type: "manual" | "ai";
+  type: "manual" | "ai" | "image";
+  shape?: "rect" | "circle";
+  strokeColor?: string;
+  strokeWidth?: number;
 }
 
 interface PDFViewerAdvancedProps {
@@ -96,6 +99,8 @@ export function PDFViewerAdvanced({
   const renderingPages = useRef(new Set<number>());
   const renderedPages = useRef(new Set<number>());
   const visiblePagesRef = useRef(new Set<number>());
+  const imageRectsRef = useRef<Record<number, Array<{ x: number; y: number; width: number; height: number }>>>({});
+  const circledPagesRef = useRef(new Set<number>());
 
   // Load PDF.js library
   useEffect(() => {
@@ -139,7 +144,7 @@ export function PDFViewerAdvanced({
 
     const loadPdf = async () => {
       try {
-        console.log("Starting PDF load from URL:", fileUrl);
+        
         const pdfjsLib = (window as unknown as { pdfjsLib: { getDocument: (params: { url: string; cMapUrl: string; cMapPacked: boolean; withCredentials: boolean }) => { promise: Promise<PDFDocumentProxy> } } }).pdfjsLib;
         const loadingTask = pdfjsLib.getDocument({
           url: fileUrl,
@@ -149,7 +154,7 @@ export function PDFViewerAdvanced({
         });
 
         const pdf = await loadingTask.promise;
-        console.log(`PDF loaded successfully with ${pdf.numPages} pages`);
+        
         setPdfDocument(pdf);
         onDocumentLoad?.(pdf.numPages);
 
@@ -159,9 +164,7 @@ export function PDFViewerAdvanced({
           const page = await pdf.getPage(i);
           const viewport = page.getViewport({ scale });
 
-          console.log(
-            `Page ${i} viewport: ${viewport.width}x${viewport.height}`
-          );
+          
 
           pageStructures.push({
             pageNumber: i,
@@ -170,7 +173,7 @@ export function PDFViewerAdvanced({
           });
         }
         setPages(pageStructures);
-        console.log("All page structures initialized");
+        
       } catch (error) {
         console.error("Error loading PDF:", error);
         onError?.("Failed to load PDF document");
@@ -188,13 +191,11 @@ export function PDFViewerAdvanced({
         renderingPages.current.has(pageIndex) ||
         renderedPages.current.has(pageIndex)
       ) {
-        console.log(
-          `Page ${pageIndex + 1} skipped - already rendering or rendered`
-        );
+        
         return;
       }
 
-      console.log(`Starting to render page ${pageIndex + 1}`);
+      
       renderingPages.current.add(pageIndex);
 
       try {
@@ -211,7 +212,7 @@ export function PDFViewerAdvanced({
           return;
         }
 
-        console.log(`Found canvas for page ${pageIndex + 1}`);
+        
 
         const context = canvas.getContext("2d");
         if (!context) {
@@ -222,11 +223,7 @@ export function PDFViewerAdvanced({
         canvas.height = viewport.height;
         canvas.width = viewport.width;
 
-        console.log(
-          `Canvas ${pageIndex + 1} dimensions set: ${canvas.width}x${
-            canvas.height
-          }`
-        );
+        
 
         // Fill with white background first
         context.fillStyle = "white";
@@ -238,17 +235,65 @@ export function PDFViewerAdvanced({
           viewport: viewport,
         };
 
+        // Intercept drawImage to capture image rectangles
+        const originalDrawImage = (context as any).drawImage?.bind(context);
+        (context as any).drawImage = function (...args: any[]) {
+          try {
+            // drawImage(img, dx, dy)
+            // drawImage(img, dx, dy, dw, dh)
+            // drawImage(img, sx, sy, sw, sh, dx, dy, dw, dh)
+            let dx = 0, dy = 0, dw = 0, dh = 0;
+            if (args.length === 3) {
+              dx = args[1]; dy = args[2];
+              dw = (args[0]?.width) || 0; dh = (args[0]?.height) || 0;
+            } else if (args.length === 5) {
+              dx = args[1]; dy = args[2]; dw = args[3]; dh = args[4];
+            } else if (args.length === 9) {
+              dx = args[5]; dy = args[6]; dw = args[7]; dh = args[8];
+            }
+            if (!imageRectsRef.current[pageIndex + 1]) imageRectsRef.current[pageIndex + 1] = [];
+            if (dw > 1 && dh > 1) {
+              // Transform rect by current context transform to device space
+              const t = (context as CanvasRenderingContext2D).getTransform();
+              const pts = [
+                { x: dx, y: dy },
+                { x: dx + dw, y: dy },
+                { x: dx, y: dy + dh },
+                { x: dx + dw, y: dy + dh },
+              ].map(p => ({
+                x: t.a * p.x + t.c * p.y + t.e,
+                y: t.b * p.x + t.d * p.y + t.f,
+              }));
+              const xs = pts.map(p => p.x);
+              const ys = pts.map(p => p.y);
+              const minX = Math.min(...xs);
+              const maxX = Math.max(...xs);
+              const minY = Math.min(...ys);
+              const maxY = Math.max(...ys);
+              const rect = { x: minX, y: minY, width: maxX - minX, height: maxY - minY };
+              imageRectsRef.current[pageIndex + 1].push(rect);
+            }
+          } catch {}
+          return originalDrawImage?.(...args);
+        };
+
         const renderTask = page.render(renderContext);
         await renderTask.promise;
 
-        console.log(`Page ${pageIndex + 1} rendered successfully`);
+        
 
         // Double check canvas actually has content
-        const imageData = context.getImageData(0, 0, 1, 1);
-        console.log(`First pixel of page ${pageIndex + 1}:`, imageData.data);
+        
+
+        // Restore drawImage just in case
+        if (originalDrawImage) {
+          (context as any).drawImage = originalDrawImage;
+        }
 
         // Mark as rendered
         renderedPages.current.add(pageIndex);
+        const captured = imageRectsRef.current[pageIndex + 1]?.length || 0;
+        
 
         // Create text layer for selection
         const textLayerId = `pdf-text-${pageIndex}`;
@@ -299,7 +344,7 @@ export function PDFViewerAdvanced({
   // Trigger initial page render
   useEffect(() => {
     if (pages.length > 0 && pdfDocument) {
-      console.log("Triggering initial render for first page");
+      
       renderPage(0);
     }
   }, [pages, pdfDocument, renderPage]);
@@ -316,7 +361,7 @@ export function PDFViewerAdvanced({
           );
 
           if (entry.isIntersecting) {
-            console.log(`Page ${pageIndex + 1} is now visible`);
+            
             visiblePagesRef.current.add(pageIndex);
 
             // Render visible page and adjacent pages for smooth scrolling
@@ -350,11 +395,11 @@ export function PDFViewerAdvanced({
     for (let i = 0; i < maxRetries; i++) {
       const textLayerDiv = document.querySelector(`[data-page-index="${pageNumber - 1}"] .textLayer`) as HTMLElement;
       if (textLayerDiv && textLayerDiv.children.length > 0) {
-        console.log(`✅ Text layer found for page ${pageNumber} after ${i + 1} attempts`);
+        
         return textLayerDiv;
       }
 
-      console.log(`⏳ Waiting for text layer page ${pageNumber}, attempt ${i + 1}/${maxRetries}`);
+      
       await new Promise(resolve => setTimeout(resolve, delay));
     }
 
@@ -365,7 +410,7 @@ export function PDFViewerAdvanced({
   // Function to programmatically select and highlight text
   type SelectOptions = { saveToDatabase?: boolean; type?: "manual" | "ai" };
   const selectAndHighlightText = useCallback(async (pageNumber: number, searchText: string, options: SelectOptions = { saveToDatabase: true, type: "manual" }) => {
-    console.log(`🔍 Attempting to select text on page ${pageNumber}: "${searchText}"`);
+    
 
     // Wait for text layer to be available with retry logic
     const textLayerDiv = await waitForTextLayer(pageNumber);
@@ -378,8 +423,7 @@ export function PDFViewerAdvanced({
     const spans = textLayerDiv.querySelectorAll('span');
     const normalizedSearch = searchText.toLowerCase().replace(/[^\w\s]/g, ' ').replace(/\s+/g, ' ').trim();
 
-    console.log(`🔍 Searching in ${spans.length} text spans for exact PDF text: "${searchText}"`);
-    console.log(`🔍 Normalized search: "${normalizedSearch}"`);
+    
 
     // Try exact text matching first, then fuzzy matching
     let foundSpan: HTMLElement | null = null;
@@ -447,7 +491,7 @@ export function PDFViewerAdvanced({
     }
 
     if (foundSpan) {
-      console.log(`✅ Found matching span (${matchType}): "${bestMatch}" (score: ${bestScore})`);
+      
 
       // Create a text selection programmatically
       const selection = window.getSelection();
@@ -464,7 +508,7 @@ export function PDFViewerAdvanced({
         setTimeout(() => {
           const saveToDatabase = options.saveToDatabase ?? true;
           const type = options.type ?? "manual";
-          console.log(`🎯 Creating highlight for: "${searchText}" (save: ${saveToDatabase}, type: ${type})`);
+          
 
           const selectionNow = window.getSelection();
           if (selectionNow && selectionNow.rangeCount > 0) {
@@ -512,23 +556,23 @@ export function PDFViewerAdvanced({
                 type: "manual",
               };
               setHighlights((prev) => [...prev, highlight]);
-              console.log(`✨ Created restored highlight visually`);
+              
             }
           }
 
-          console.log(`📊 Current highlights count: ${highlights.length}`);
+          
           selection.removeAllRanges(); // Clear selection after highlighting
         }, 200);
       }
     } else {
-      console.log(`❌ Could not find matching text span for: "${normalizedSearch}"`);
+      
       throw new Error("Text not found in spans");
     }
   }, [onTextSelected, highlights.length, setHighlights, onHighlightCreated]);
 
   // Fallback function to create manual highlight (used programmatically)
   const createManualHighlight = useCallback((pageNumber: number, text: string) => {
-    console.log(`🎯 Creating manual highlight on page ${pageNumber}: "${text}"`);
+    
 
     const highlight: Highlight = {
       id: `ai-highlight-${Date.now()}-${pageNumber}`,
@@ -544,7 +588,7 @@ export function PDFViewerAdvanced({
     // Store in database
     if (onHighlightCreated) {
       onHighlightCreated(highlight);
-      console.log(`💾 Stored manual highlight in database`);
+      
     }
   }, [onHighlightCreated]);
 
@@ -558,7 +602,7 @@ export function PDFViewerAdvanced({
 
     const loadExistingHighlights = async () => {
       try {
-        console.log(`📂 Loading existing highlights for document: ${documentId}`);
+        
         const response = await fetch(`/api/annotations?documentId=${documentId}`);
 
         if (!response.ok) {
@@ -569,7 +613,7 @@ export function PDFViewerAdvanced({
         const data = await response.json();
         const annotations = data.annotations || [];
 
-        console.log(`📊 Found ${annotations.length} existing annotations`);
+        
 
         // Map stored coordinates directly to highlight overlays (fast path)
         const mapped = annotations
@@ -578,14 +622,20 @@ export function PDFViewerAdvanced({
             id: `ann-${a.id}`,
             pageNumber: a.pageNumber as number,
             text: a.highlightText as string,
-            rects: [{ x: a.x || 0, y: a.y || 0, width: a.width || 0, height: a.height || 0 }],
-            color: a.color || '#ffff00',
-            type: a.createdBy === 'ai' ? 'ai' as const : 'manual' as const,
+            rects: [{ x: a.x ?? 0, y: a.y ?? 0, width: a.width ?? 0, height: a.height ?? 0 }],
+            color: a.color || (a.type === 'image_highlight' ? '#ff0000' : '#ffff00'),
+            type: a.type === 'image_highlight' ? 'image' as const : (a.createdBy === 'ai' ? 'ai' as const : 'manual' as const),
+            shape: a.type === 'image_highlight' ? 'circle' as const : 'rect' as const,
+            strokeColor: a.type === 'image_highlight' ? '#ff0000' : undefined,
+            strokeWidth: a.type === 'image_highlight' ? 2 : undefined,
           }));
-
-        setHighlights((prev) => [...prev, ...mapped]);
+        const valid = mapped.map(m => ({
+          ...m,
+          rects: m.rects.filter(r => r.width > 1 && r.height > 1),
+        })).filter(m => m.rects.length > 0);
+        setHighlights((prev) => [...prev, ...valid]);
         setHighlightsLoaded(true);
-        console.log(`✅ Rendered ${mapped.length} stored highlights immediately`);
+        
       } catch (error) {
         console.error("Failed to load existing highlights:", error);
         setHighlightsLoaded(true);
@@ -609,7 +659,7 @@ export function PDFViewerAdvanced({
     lastProcessedSignatureRef.current = currentSignature;
 
     const processAIHighlights = async () => {
-      console.log("🎯 Processing AI highlights (client-side):", aiHighlightPhrases);
+      
 
           // Extract page texts once
       type PageText = { page: number; text: string };
@@ -650,12 +700,12 @@ export function PDFViewerAdvanced({
           const top = candidates.slice(0, aiTopK).filter(c => c.score > aiMinScore);
 
           if (top.length === 0) {
-            console.log("❌ No strong sentence match found for AI response");
+            
             onNoMatchFound?.("I couldn't find relevant content for that answer in this PDF.");
             continue;
           }
 
-          console.log("🏆 Top matches:", top.map(t => ({ page: t.page, score: Number(t.score.toFixed(3)), text: t.sentence.substring(0, 80) + (t.sentence.length > 80 ? "..." : "") })));
+          
 
           // Scroll to the best match and highlight it first, then others
           for (let i = 0; i < top.length; i++) {
@@ -677,6 +727,121 @@ export function PDFViewerAdvanced({
             } catch (e) {
               console.warn("Fallback to manual highlight for:", sentence.substring(0, 60));
               createManualHighlight(page, sentence);
+            }
+
+            // Additionally, try to circle the most relevant image on the page (once per page)
+            if (i === 0 && !circledPagesRef.current.has(page)) {
+              const rects = imageRectsRef.current[page] || [];
+              if (rects.length > 0) {
+                // Gate on keywords or "massive" image size
+                const keywordRe = /(fig(?:ure)?\.?|image|diagram|chart|graph|table|photo|picture)/i;
+                const hasKeywords = keywordRe.test(aiResponse);
+                const vp = pages[page - 1]?.viewport;
+                const pageArea = vp ? vp.width * vp.height : 0;
+                const largest = rects.reduce((a, b) => (a.width * a.height >= b.width * b.height ? a : b));
+                const largestRatio = pageArea ? (largest.width * largest.height) / pageArea : 0;
+                const allowBySize = largestRatio >= 0.12; // consider as massive content
+
+                if (hasKeywords || allowBySize) {
+                  // Heuristic: prefer image nearest to a caption if present; else use largest
+                  const findCaptionY = async (): Promise<number | null> => {
+                    try {
+                      const textLayer = await waitForTextLayer(page, 10, 200);
+                      if (!textLayer) return null;
+                      const spans = Array.from(textLayer.querySelectorAll('span')) as HTMLElement[];
+                      const pageElement = textLayer.closest('.pdf-page-container') as HTMLElement | null;
+                      const pageRect = pageElement?.getBoundingClientRect();
+                      const figMatch = aiResponse.match(/fig(?:ure)?\.?\s*(\d{1,3})/i);
+                      const figNum = figMatch ? figMatch[1] : null;
+                      let bestY: number | null = null;
+                      for (const span of spans) {
+                        const txt = (span.textContent || '').trim();
+                        if (!txt) continue;
+                        const isFigureLine = /^(fig(?:ure)?\.?|image|diagram|chart|graph|table)\s*\d*[:).\-]?/i.test(txt) || /^(figure|fig\.)/i.test(txt);
+                        if (!isFigureLine) continue;
+                        if (figNum && !new RegExp(`(fig(?:ure)?\.?\s*${figNum})`, 'i').test(txt)) {
+                          continue;
+                        }
+                        const r = span.getBoundingClientRect();
+                        const y = pageRect ? r.top - pageRect.top : parseFloat(span.style.top || '0');
+                        bestY = y;
+                        break;
+                      }
+                      return bestY;
+                    } catch {
+                      return null;
+                    }
+                  };
+
+                  let chosen: { x: number; y: number; width: number; height: number } | null = null;
+                  const captionY = await findCaptionY();
+                  if (captionY != null) {
+                    let bestDelta = Infinity;
+                    for (const r of rects) {
+                      const cy = r.y + r.height / 2;
+                      const delta = Math.abs(cy - captionY);
+                      if (delta < bestDelta) {
+                        bestDelta = delta;
+                        chosen = r;
+                      }
+                    }
+                  }
+                  if (!chosen) chosen = largest;
+
+                  if (chosen && chosen.width > 2 && chosen.height > 2) {
+                    const imageHighlight: Highlight = {
+                      id: `image-highlight-${Date.now()}-${page}`,
+                      pageNumber: page,
+                      text: "image",
+                      rects: [chosen],
+                      color: "transparent",
+                      type: "image",
+                      shape: "circle",
+                      strokeColor: "#ff0000",
+                      strokeWidth: 2,
+                    };
+                    setHighlights((prev) => [...prev, imageHighlight]);
+                    onHighlightCreated?.(imageHighlight);
+                    circledPagesRef.current.add(page);
+                  }
+                }
+              }
+            }
+          }
+
+          // If AI mentions a specific figure number, attempt to circle on that page too
+          const figMatch = aiResponse.match(/fig(?:ure)?\.?\s*(\d{1,3})(?:[-–]\s*(\d{1,3}))?/i);
+          if (figMatch) {
+            const figNum = figMatch[1];
+            // Find the first page whose text mentions that figure
+            const findPageForFigure = (num: string) => {
+              const target = `figure ${num}`;
+              for (const pt of pagesText) {
+                if (normalizeText(pt.text).includes(target)) return pt.page;
+              }
+              return null;
+            };
+            const figPage = findPageForFigure(figNum);
+            if (figPage && !circledPagesRef.current.has(figPage)) {
+              try { await renderPage(figPage - 1); } catch {}
+              const rects = imageRectsRef.current[figPage] || [];
+              if (rects.length > 0) {
+                const chosen = rects.reduce((a, b) => (a.width * a.height >= b.width * b.height ? a : b));
+                const imageHighlight: Highlight = {
+                  id: `image-highlight-${Date.now()}-${figPage}`,
+                  pageNumber: figPage,
+                  text: "image",
+                  rects: [chosen],
+                  color: "transparent",
+                  type: "image",
+                  shape: "circle",
+                  strokeColor: "#ff0000",
+                  strokeWidth: 2,
+                };
+                setHighlights((prev) => [...prev, imageHighlight]);
+                onHighlightCreated?.(imageHighlight);
+                circledPagesRef.current.add(figPage);
+              }
             }
           }
         } catch (err) {
@@ -751,7 +916,15 @@ export function PDFViewerAdvanced({
               <HighlightLayer
                 items={highlights
                   .filter((h) => h.pageNumber === index + 1)
-                  .map((h) => ({ id: h.id, rects: h.rects, color: h.color, type: h.type }))}
+                  .map((h) => ({
+                    id: h.id,
+                    rects: h.rects,
+                    color: h.color,
+                    type: h.type,
+                    shape: h.shape,
+                    strokeColor: h.strokeColor,
+                    strokeWidth: h.strokeWidth,
+                  }))}
               />
 
               {/* Page number */}

@@ -77,7 +77,7 @@ export async function POST(
 
       await Promise.all(pagePromises);
 
-      console.log(`✅ Document processed successfully: ${documentId}`);
+      
 
       return NextResponse.json({
         success: true,

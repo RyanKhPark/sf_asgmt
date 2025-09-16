@@ -184,18 +184,11 @@ export function PDFChat({
 
       // Speak the AI response if voice mode is enabled
       if (isConversationModeRef.current && data.message) {
-        console.log(
-          "🔊 Speaking AI response:",
-          data.message.substring(0, 50) + "..."
-        );
         await speakText(data.message);
       }
 
       // Use AI to extract topic and find matching PDF content
       if (onHighlightText && data.message) {
-        console.log(
-          `🎯 Triggering highlight analysis for AI response: "${data.message}"`
-        );
         onHighlightText([data.message]);
       }
 
@@ -258,7 +251,7 @@ export function PDFChat({
 
     recognition.onstart = () => {
       setIsListening(true);
-      console.log("Speech recognition started");
+      
       finalTranscriptRef.current = "";
       currentInterimRef.current = "";
     };
@@ -280,7 +273,7 @@ export function PDFChat({
       // Update the final transcript if we got new final results
       if (finalTranscript) {
         finalTranscriptRef.current += finalTranscript;
-        console.log("Final transcript updated:", finalTranscriptRef.current);
+        
       }
 
       // Calculate full current transcript
@@ -298,10 +291,7 @@ export function PDFChat({
 
       // In conversation mode, check for auto-submission
       if (isConversationModeRef.current && fullTranscript.trim()) {
-        console.log(
-          "🎙️ Processing transcript in conversation mode:",
-          fullTranscript
-        );
+        
 
         // Clear existing timer
         if (silenceTimerRef.current) {
@@ -313,10 +303,7 @@ export function PDFChat({
 
         // Check for sentence ending punctuation
         if (trimmedText.match(/[.!?]$/)) {
-          console.log(
-            "📝 Sentence complete (punctuation), submitting:",
-            trimmedText
-          );
+          
           submitVoiceMessage(trimmedText);
           return;
         }
@@ -329,9 +316,7 @@ export function PDFChat({
         // Set silence timer (shorter for likely questions)
         const silenceDelay = mightBeQuestion ? 1500 : 2000;
 
-        console.log(
-          `⏱️ Setting silence timer for ${silenceDelay}ms (question: ${mightBeQuestion})`
-        );
+        
         silenceTimerRef.current = setTimeout(() => {
           if (
             finalTranscriptRef.current.trim() ||
@@ -340,15 +325,12 @@ export function PDFChat({
             const finalText = (
               finalTranscriptRef.current + currentInterimRef.current
             ).trim();
-            console.log(
-              `📝 Silence detected after ${silenceDelay}ms, submitting:`,
-              finalText
-            );
+            
             submitVoiceMessage(finalText);
           }
         }, silenceDelay);
       } else if (!isConversationModeRef.current && fullTranscript.trim()) {
-        console.log("📝 Manual mode - not auto-submitting");
+        
       }
     };
 
@@ -363,7 +345,7 @@ export function PDFChat({
 
     recognition.onend = () => {
       setIsListening(false);
-      console.log("Speech recognition ended");
+      
 
       // Clear any pending timer
       if (silenceTimerRef.current) {
@@ -376,14 +358,9 @@ export function PDFChat({
         finalTranscriptRef.current + currentInterimRef.current
       ).trim();
       if (isConversationModeRef.current && remainingText && !isSpeaking) {
-        console.log(
-          "📝 Recognition ended, submitting remaining:",
-          remainingText
-        );
         submitVoiceMessage(remainingText);
       } else if (isConversationModeRef.current && !isSpeaking) {
         // If in conversation mode but no text, restart listening
-        console.log("🎤 Restarting recognition after unexpected stop");
         setTimeout(() => {
           if (
             recognitionRef.current &&
@@ -411,12 +388,7 @@ export function PDFChat({
   // Helper function to submit voice message
   const submitVoiceMessage = (text: string) => {
     const trimmedText = text.trim();
-    if (!trimmedText) {
-      console.log("❌ Empty message, not submitting");
-      return;
-    }
-
-    console.log("✅ Submitting voice message:", trimmedText);
+    if (!trimmedText) return;
 
     // Clear timers and transcript
     if (silenceTimerRef.current) {
@@ -443,7 +415,6 @@ export function PDFChat({
     }
 
     // Send the message to AI
-    console.log("📤 Sending to AI:", trimmedText);
     sendMessageToAI(trimmedText);
   };
 
@@ -453,7 +424,6 @@ export function PDFChat({
 
     return new Promise<void>((resolve) => {
       setIsSpeaking(true);
-      console.log("🔊 Speaking AI response:", text.substring(0, 50) + "...");
       useBrowserTTS(text, resolve);
     });
   };
@@ -487,7 +457,6 @@ export function PDFChat({
     }
 
     utterance.onend = () => {
-      console.log("🔊 Browser speech synthesis ended");
       setIsSpeaking(false);
       restartListeningAfterSpeech();
       resolve();
@@ -500,17 +469,13 @@ export function PDFChat({
     };
 
     window.speechSynthesis.speak(utterance);
-    console.log(
-      "🔊 Started browser TTS with voice:",
-      preferredVoice?.name || "default"
-    );
   };
 
   // Helper to restart listening after speech ends
   const restartListeningAfterSpeech = () => {
     if (isConversationModeRef.current && recognitionRef.current) {
       setTimeout(() => {
-        console.log("🎤 Restarting speech recognition after speech");
+        
         finalTranscriptRef.current = "";
         currentInterimRef.current = "";
         setInterimTranscript("");
@@ -526,7 +491,7 @@ export function PDFChat({
   // Toggle voice conversation mode
   const toggleVoiceMode = async () => {
     const newState = !isConversationMode;
-    console.log(`🎙️ Toggling voice mode: ${newState ? "ON" : "OFF"}`);
+    
 
     setIsConversationMode(newState);
     setIsSpeechEnabled(newState);
@@ -541,7 +506,7 @@ export function PDFChat({
       initializeSpeechRecognition();
 
       // Using browser TTS - no additional setup needed
-      console.log("Voice mode ready with browser TTS");
+      
 
       toast.success("🎤 Voice mode enabled - Start speaking!");
 
@@ -550,7 +515,7 @@ export function PDFChat({
         if (recognitionRef.current) {
           try {
             recognitionRef.current.start();
-            console.log("🎤 Started listening");
+            
           } catch (e) {
             console.error("Failed to start recognition:", e);
             toast.error("Failed to start voice recognition");
@@ -578,7 +543,6 @@ export function PDFChat({
       currentInterimRef.current = "";
 
       toast.success("🔇 Voice mode disabled");
-      console.log("🔇 Voice mode disabled");
     }
   };
 
