@@ -30,18 +30,10 @@ interface PDFChatWrapperProps {
 }
 
 export function PDFChatWrapper({ document }: PDFChatWrapperProps) {
-  const [selectedText, setSelectedText] = useState<string>("");
-  const [, setCurrentPage] = useState(1);
   const [aiHighlightPhrases, setAiHighlightPhrases] = useState<string[]>([]);
   const [, setManualHighlights] = useState<Highlight[]>([]);
   const [externalNotice, setExternalNotice] = useState<string | null>(null);
   const [activeMessageId, setActiveMessageId] = useState<string | null>(null);
-
-  const handleTextSelected = useCallback((text: string, pageNumber: number) => {
-    console.log(`Text selected on page ${pageNumber}: "${text}"`);
-    setSelectedText(text);
-    setCurrentPage(pageNumber);
-  }, []);
 
   const handleHighlightCreated = useCallback(
     async (highlight: Highlight) => {
@@ -105,13 +97,8 @@ export function PDFChatWrapper({ document }: PDFChatWrapperProps) {
       <div className="fit-content border-r border-gray-300 overflow-hidden">
         <div className="h-full flex flex-col relative">
           {/* Header */}
-          <div className="px-4 py-2 border-b border-gray-200 bg-gray-50">
+          <div className="px-4 h-14 flex items-center justify-center border-b border-gray-200 bg-gray-50 ">
             <h2 className="font-semibold text-gray-900">{document.title}</h2>
-            <p className="text-sm text-gray-500">
-              {selectedText
-                ? `Selected: "${selectedText.substring(0, 50)}..."`
-                : "Select text to highlight"}
-            </p>
           </div>
 
           {/* PDF Viewer */}
@@ -119,7 +106,6 @@ export function PDFChatWrapper({ document }: PDFChatWrapperProps) {
             <PDFViewerAdvanced
               fileUrl={document.fileUrl}
               documentId={document.id}
-              onTextSelected={handleTextSelected}
               onHighlightCreated={handleHighlightCreated}
               aiHighlightPhrases={aiHighlightPhrases}
               activeMessageId={activeMessageId || undefined}
@@ -140,7 +126,9 @@ export function PDFChatWrapper({ document }: PDFChatWrapperProps) {
           pdfContent={document.extractedText || ""}
           onHighlightText={handleAIHighlight}
           externalNotice={externalNotice || undefined}
-          onAIMessageSaved={(messageId: string) => setActiveMessageId(messageId)}
+          onAIMessageSaved={(messageId: string) =>
+            setActiveMessageId(messageId)
+          }
         />
       </div>
     </div>

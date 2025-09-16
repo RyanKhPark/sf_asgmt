@@ -596,11 +596,11 @@ export function PDFChat({
   return (
     <div className="flex flex-col h-full bg-white border-l border-gray-200">
       {/* Header */}
-      <div className="px-4 py-3 border-b border-gray-200 bg-gray-50">
-        <h3 className="font-semibold text-gray-900">AI Assistant</h3>
-        <p className="text-sm text-gray-500">
-          Ask questions about this document
-        </p>
+      <div className="px-4 h-14 flex items-center border-b border-gray-200 bg-gray-50">
+        <div>
+          <h3 className="font-semibold text-gray-900 leading-tight">AI Assistant</h3>
+          <p className="text-xs text-gray-500">Ask questions about this document</p>
+        </div>
       </div>
 
       {/* Messages */}

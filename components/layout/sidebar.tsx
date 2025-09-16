@@ -80,7 +80,7 @@ export default function HomeSidebar() {
       )}
     >
       {/* Header */}
-      <div className="flex items-center px-4 py-4 border-b border-border min-h-[73px]">
+      <div className="flex items-center px-4 h-14 border-b border-border">
         <div className="flex items-center gap-2 flex-1 min-w-0">
           <div className="overflow-hidden">
             <Link href="/" className="flex items-center gap-2">
