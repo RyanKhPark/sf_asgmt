@@ -32,15 +32,7 @@ export default function HomeSidebar() {
   const [isCollapsed, setIsCollapsed] = useState(false);
   const [showAuthModal, setShowAuthModal] = useState(false);
   const { data: session } = useSession();
-  const [recentDocs, setRecentDocs] = useState<
-    Array<{
-      id: string;
-      title: string;
-      uploadedAt: string;
-      processingStatus: string | null;
-      totalPages: number | null;
-    }>
-  >([]);
+  const [recentDocs, setRecentDocs] = useState<Array<{ id: string; title: string; uploadedAt: string; processingStatus: string | null; totalPages: number | null }>>([]);
   const [loadingDocs, setLoadingDocs] = useState(false);
 
   const toggleSidebar = () => {
@@ -127,8 +119,8 @@ export default function HomeSidebar() {
                     if (session) {
                       window.location.href = item.href;
                     } else {
-                      // Redirect signed-out users to home
-                      window.location.href = "/";
+                      // Show auth modal when logged out
+                      setShowAuthModal(true);
                     }
                   }}
                   className={cn(
@@ -175,20 +167,15 @@ export default function HomeSidebar() {
               )}
             </li>
           ))}
-          {/* Recent PDFs list (only when user has history) */}
-          {session && !isCollapsed && (
+          {session && (
             <li className="mt-4">
               <div className="text-xs uppercase tracking-wide text-muted-foreground px-3 mb-2">
                 Recent PDFs
               </div>
               {loadingDocs ? (
-                <div className="px-3 py-1 text-xs text-muted-foreground">
-                  Loading…
-                </div>
+                <div className="px-3 py-1 text-xs text-muted-foreground">Loading…</div>
               ) : recentDocs.length === 0 ? (
-                <div className="px-3 py-1 text-sm text-muted-foreground">
-                  Try your first!.
-                </div>
+                <div className="px-3 py-1 text-sm text-muted-foreground">Try your first!.</div>
               ) : (
                 <ul className="space-y-1">
                   {recentDocs.map((doc, idx) => (
@@ -197,14 +184,11 @@ export default function HomeSidebar() {
                         href={`/pdfchat/${doc.id}`}
                         className={cn(
                           "w-full flex items-center px-3 py-2 rounded-md hover:bg-sidebar-accent transition-colors text-left min-w-0",
-                          pathname === `/pdfchat/${doc.id}` &&
-                            "bg-sidebar-accent"
+                          pathname === `/pdfchat/${doc.id}` && "bg-sidebar-accent"
                         )}
                         title={doc.title}
                       >
-                        <span className="text-sm truncate max-w-full">
-                          {idx === 0 ? `• ${doc.title}` : doc.title}
-                        </span>
+                        <span className="text-sm truncate max-w-full">{idx === 0 ? `• ${doc.title}` : doc.title}</span>
                       </Link>
                     </li>
                   ))}

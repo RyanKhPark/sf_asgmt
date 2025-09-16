@@ -1,6 +1,8 @@
 "use client";
 
 import { useRef, useEffect, useState, useCallback } from "react";
+import { HighlightLayer } from "./highlight-layer";
+import { normalizeText, toWords, sentenceSplit, jaccard } from "@/lib/pdf-text-utils";
 import { Loader2 } from "lucide-react";
 
 interface PDFViewport {
@@ -718,21 +720,7 @@ export function PDFViewerAdvanced({
     const processAIHighlights = async () => {
       console.log("🎯 Processing AI highlights (client-side):", aiHighlightPhrases);
 
-      // Helpers
-      const norm = (s: string) => s.toLowerCase().replace(/[^\w\s]/g, " ").replace(/\s+/g, " ").trim();
-      const toWords = (s: string) => norm(s).split(" ").filter(w => w.length >= 3);
-      const sentenceSplit = (s: string) => s
-        .replace(/\n+/g, " ")
-        .split(/(?<=[\.!?])\s+/)
-        .map(t => t.trim())
-        .filter(Boolean);
-      const jaccard = (a: Set<string>, b: Set<string>) => {
-        const inter = new Set([...a].filter(x => b.has(x))).size;
-        const uni = new Set([...a, ...b]).size || 1;
-        return inter / uni;
-      };
-
-      // Extract page texts once
+          // Extract page texts once
       type PageText = { page: number; text: string };
       const pagesText: PageText[] = [];
       for (let pageNum = 1; pageNum <= pdfDocument.numPages; pageNum++) {
@@ -744,7 +732,7 @@ export function PDFViewerAdvanced({
 
       for (const aiResponse of aiHighlightPhrases) {
         try {
-          const aiNorm = norm(aiResponse);
+          const aiNorm = normalizeText(aiResponse);
           const aiWords = new Set(toWords(aiResponse));
 
           type Candidate = { page: number; sentence: string; score: number };
@@ -753,7 +741,7 @@ export function PDFViewerAdvanced({
           for (const pt of pagesText) {
             const sentences = sentenceSplit(pt.text);
             for (const sent of sentences) {
-              const sNorm = norm(sent);
+              const sNorm = normalizeText(sent);
               if (!sNorm) continue;
               const sWords = new Set(toWords(sent));
               let score = jaccard(aiWords, sWords);
@@ -869,31 +857,11 @@ export function PDFViewerAdvanced({
               />
 
               {/* Highlights layer */}
-              <div className="absolute top-0 left-0 pointer-events-none">
-                {highlights
+              <HighlightLayer
+                items={highlights
                   .filter((h) => h.pageNumber === index + 1)
-                  .map((highlight) => (
-                    <div key={highlight.id}>
-                      {highlight.rects.map((rect, rectIndex) => (
-                        <div
-                          key={rectIndex}
-                          className={`absolute ${
-                            highlight.type === "ai" ? "animate-pulse" : ""
-                          }`}
-                          style={{
-                            left: `${rect.x}px`,
-                            top: `${rect.y}px`,
-                            width: `${rect.width}px`,
-                            height: `${rect.height}px`,
-                            backgroundColor: highlight.color,
-                            opacity: 0.3,
-                            mixBlendMode: "multiply",
-                          }}
-                        />
-                      ))}
-                    </div>
-                  ))}
-              </div>
+                  .map((h) => ({ id: h.id, rects: h.rects, color: h.color, type: h.type }))}
+              />
 
               {/* Page number */}
               <div className="absolute bottom-2 right-2 bg-gray-800 text-white px-2 py-1 rounded text-xs">
