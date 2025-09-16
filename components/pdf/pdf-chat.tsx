@@ -2,8 +2,9 @@
 
 import { useState, useRef, useEffect } from "react";
 import { Button } from "@/components/ui/button";
-import { Send, Mic, MicOff, Waves, AudioWaveform } from "lucide-react";
+import { Send, Mic, MicOff } from "lucide-react";
 import { toast } from "sonner";
+import { useTTS } from "@/hooks/use-tts";
 import { MessageBubble } from "@/components/chat/message-bubble";
 import { TypingDots } from "@/components/chat/typing-dots";
 // Using browser TTS for voice synthesis
@@ -36,12 +37,12 @@ interface SpeechRecognition extends EventTarget {
   continuous: boolean;
   interimResults: boolean;
   lang: string;
-  onstart: ((this: SpeechRecognition, ev: Event) => any) | null;
+  onstart: ((this: SpeechRecognition, ev: Event) => void) | null;
   onresult:
-    | ((this: SpeechRecognition, ev: SpeechRecognitionEvent) => any)
+    | ((this: SpeechRecognition, ev: SpeechRecognitionEvent) => void)
     | null;
-  onerror: ((this: SpeechRecognition, ev: Event) => any) | null;
-  onend: ((this: SpeechRecognition, ev: Event) => any) | null;
+  onerror: ((this: SpeechRecognition, ev: Event) => void) | null;
+  onend: ((this: SpeechRecognition, ev: Event) => void) | null;
   start(): void;
   stop(): void;
   abort(): void;
@@ -179,23 +180,18 @@ export function PDFChat({
 
       // If API returns a persisted messageId, expose it for linking highlights
       if (data.messageId && typeof data.messageId === "string") {
-        try { onAIMessageSaved?.(data.messageId); } catch {}
+        try {
+          onAIMessageSaved?.(data.messageId);
+        } catch {}
       }
 
       // Speak the AI response if voice mode is enabled
       if (isConversationModeRef.current && data.message) {
-        console.log(
-          "🔊 Speaking AI response:",
-          data.message.substring(0, 50) + "..."
-        );
-        await speakText(data.message);
+        await speak(data.message);
       }
 
       // Use AI to extract topic and find matching PDF content
       if (onHighlightText && data.message) {
-        console.log(
-          `🎯 Triggering highlight analysis for AI response: "${data.message}"`
-        );
         onHighlightText([data.message]);
       }
 
@@ -242,28 +238,44 @@ export function PDFChat({
   const initializeSpeechRecognition = () => {
     if (typeof window === "undefined") return;
 
-    const SpeechRecognition =
-      (window as any).SpeechRecognition ||
-      (window as any).webkitSpeechRecognition;
-    if (!SpeechRecognition) {
+    const SpeechRecognitionConstructor =
+      (
+        window as Window &
+          typeof globalThis & {
+            SpeechRecognition?: new () => SpeechRecognition;
+            webkitSpeechRecognition?: new () => SpeechRecognition;
+          }
+      ).SpeechRecognition ||
+      (
+        window as Window &
+          typeof globalThis & {
+            SpeechRecognition?: new () => SpeechRecognition;
+            webkitSpeechRecognition?: new () => SpeechRecognition;
+          }
+      ).webkitSpeechRecognition;
+    if (!SpeechRecognitionConstructor) {
       toast.error("Speech recognition not supported in this browser");
       return;
     }
 
-    const recognition = new SpeechRecognition();
+    const recognition = new SpeechRecognitionConstructor();
     recognition.continuous = true;
     recognition.interimResults = true;
     recognition.lang = "en-US";
-    recognition.maxAlternatives = 1;
+    try {
+      (
+        recognition as SpeechRecognition & { maxAlternatives?: number }
+      ).maxAlternatives = 1;
+    } catch {}
 
     recognition.onstart = () => {
       setIsListening(true);
-      console.log("Speech recognition started");
+
       finalTranscriptRef.current = "";
       currentInterimRef.current = "";
     };
 
-    recognition.onresult = (event: any) => {
+    recognition.onresult = (event: SpeechRecognitionEvent) => {
       let interimTranscript = "";
       let finalTranscript = "";
 
@@ -280,7 +292,6 @@ export function PDFChat({
       // Update the final transcript if we got new final results
       if (finalTranscript) {
         finalTranscriptRef.current += finalTranscript;
-        console.log("Final transcript updated:", finalTranscriptRef.current);
       }
 
       // Calculate full current transcript
@@ -298,11 +309,6 @@ export function PDFChat({
 
       // In conversation mode, check for auto-submission
       if (isConversationModeRef.current && fullTranscript.trim()) {
-        console.log(
-          "🎙️ Processing transcript in conversation mode:",
-          fullTranscript
-        );
-
         // Clear existing timer
         if (silenceTimerRef.current) {
           clearTimeout(silenceTimerRef.current);
@@ -313,10 +319,6 @@ export function PDFChat({
 
         // Check for sentence ending punctuation
         if (trimmedText.match(/[.!?]$/)) {
-          console.log(
-            "📝 Sentence complete (punctuation), submitting:",
-            trimmedText
-          );
           submitVoiceMessage(trimmedText);
           return;
         }
@@ -329,9 +331,6 @@ export function PDFChat({
         // Set silence timer (shorter for likely questions)
         const silenceDelay = mightBeQuestion ? 1500 : 2000;
 
-        console.log(
-          `⏱️ Setting silence timer for ${silenceDelay}ms (question: ${mightBeQuestion})`
-        );
         silenceTimerRef.current = setTimeout(() => {
           if (
             finalTranscriptRef.current.trim() ||
@@ -340,22 +339,19 @@ export function PDFChat({
             const finalText = (
               finalTranscriptRef.current + currentInterimRef.current
             ).trim();
-            console.log(
-              `📝 Silence detected after ${silenceDelay}ms, submitting:`,
-              finalText
-            );
+
             submitVoiceMessage(finalText);
           }
         }, silenceDelay);
       } else if (!isConversationModeRef.current && fullTranscript.trim()) {
-        console.log("📝 Manual mode - not auto-submitting");
       }
     };
 
-    recognition.onerror = (event: any) => {
-      console.error("Speech recognition error:", event.error);
-      if (event.error !== "no-speech") {
-        toast.error("Speech recognition error: " + event.error);
+    recognition.onerror = (event: Event) => {
+      const errorEvent = event as Event & { error?: string };
+      console.error("Speech recognition error:", errorEvent.error);
+      if (errorEvent.error && errorEvent.error !== "no-speech") {
+        toast.error("Speech recognition error: " + errorEvent.error);
       }
       setIsListening(false);
       setInterimTranscript("");
@@ -363,7 +359,6 @@ export function PDFChat({
 
     recognition.onend = () => {
       setIsListening(false);
-      console.log("Speech recognition ended");
 
       // Clear any pending timer
       if (silenceTimerRef.current) {
@@ -376,14 +371,9 @@ export function PDFChat({
         finalTranscriptRef.current + currentInterimRef.current
       ).trim();
       if (isConversationModeRef.current && remainingText && !isSpeaking) {
-        console.log(
-          "📝 Recognition ended, submitting remaining:",
-          remainingText
-        );
         submitVoiceMessage(remainingText);
       } else if (isConversationModeRef.current && !isSpeaking) {
         // If in conversation mode but no text, restart listening
-        console.log("🎤 Restarting recognition after unexpected stop");
         setTimeout(() => {
           if (
             recognitionRef.current &&
@@ -411,12 +401,7 @@ export function PDFChat({
   // Helper function to submit voice message
   const submitVoiceMessage = (text: string) => {
     const trimmedText = text.trim();
-    if (!trimmedText) {
-      console.log("❌ Empty message, not submitting");
-      return;
-    }
-
-    console.log("✅ Submitting voice message:", trimmedText);
+    if (!trimmedText) return;
 
     // Clear timers and transcript
     if (silenceTimerRef.current) {
@@ -443,74 +428,19 @@ export function PDFChat({
     }
 
     // Send the message to AI
-    console.log("📤 Sending to AI:", trimmedText);
     sendMessageToAI(trimmedText);
   };
 
-  // Text-to-Speech using browser's speech synthesis
-  const speakText = async (text: string) => {
-    if (!isConversationModeRef.current) return;
-
-    return new Promise<void>((resolve) => {
-      setIsSpeaking(true);
-      console.log("🔊 Speaking AI response:", text.substring(0, 50) + "...");
-      useBrowserTTS(text, resolve);
-    });
-  };
-
-  // Browser's speech synthesis with optimized voice selection
-  const useBrowserTTS = (text: string, resolve: () => void) => {
-    if (typeof window === "undefined" || !window.speechSynthesis) {
-      console.error("Speech synthesis not supported");
-      setIsSpeaking(false);
-      resolve();
-      return;
-    }
-
-    // Cancel any ongoing speech
-    window.speechSynthesis.cancel();
-
-    const utterance = new SpeechSynthesisUtterance(text);
-    utterance.rate = 1.0;
-    utterance.pitch = 1.0;
-    utterance.volume = 1.0;
-
-    // Get available voices and select a good one
-    const voices = window.speechSynthesis.getVoices();
-    const preferredVoice =
-      voices.find((v) => v.lang === "en-US" && v.localService) ||
-      voices.find((v) => v.lang === "en-US") ||
-      voices[0];
-
-    if (preferredVoice) {
-      utterance.voice = preferredVoice;
-    }
-
-    utterance.onend = () => {
-      console.log("🔊 Browser speech synthesis ended");
-      setIsSpeaking(false);
-      restartListeningAfterSpeech();
-      resolve();
-    };
-
-    utterance.onerror = (event) => {
-      console.error("Speech synthesis error:", event);
-      setIsSpeaking(false);
-      resolve();
-    };
-
-    window.speechSynthesis.speak(utterance);
-    console.log(
-      "🔊 Started browser TTS with voice:",
-      preferredVoice?.name || "default"
-    );
-  };
+  const { speak } = useTTS({
+    enabledRef: isConversationModeRef,
+    onEnd: () => restartListeningAfterSpeech(),
+    setIsSpeaking,
+  });
 
   // Helper to restart listening after speech ends
   const restartListeningAfterSpeech = () => {
     if (isConversationModeRef.current && recognitionRef.current) {
       setTimeout(() => {
-        console.log("🎤 Restarting speech recognition after speech");
         finalTranscriptRef.current = "";
         currentInterimRef.current = "";
         setInterimTranscript("");
@@ -526,7 +456,6 @@ export function PDFChat({
   // Toggle voice conversation mode
   const toggleVoiceMode = async () => {
     const newState = !isConversationMode;
-    console.log(`🎙️ Toggling voice mode: ${newState ? "ON" : "OFF"}`);
 
     setIsConversationMode(newState);
     setIsSpeechEnabled(newState);
@@ -540,9 +469,6 @@ export function PDFChat({
 
       initializeSpeechRecognition();
 
-      // Using browser TTS - no additional setup needed
-      console.log("Voice mode ready with browser TTS");
-
       toast.success("🎤 Voice mode enabled - Start speaking!");
 
       // Start listening automatically
@@ -550,7 +476,6 @@ export function PDFChat({
         if (recognitionRef.current) {
           try {
             recognitionRef.current.start();
-            console.log("🎤 Started listening");
           } catch (e) {
             console.error("Failed to start recognition:", e);
             toast.error("Failed to start voice recognition");
@@ -578,11 +503,11 @@ export function PDFChat({
       currentInterimRef.current = "";
 
       toast.success("🔇 Voice mode disabled");
-      console.log("🔇 Voice mode disabled");
     }
   };
 
-  // Start/stop listening
+  // Start/stop listening (unused but kept for potential future use)
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
   const toggleListening = () => {
     if (!isSpeechEnabled) return;
 
@@ -596,11 +521,15 @@ export function PDFChat({
   return (
     <div className="flex flex-col h-full bg-white border-l border-gray-200">
       {/* Header */}
-      <div className="px-4 py-3 border-b border-gray-200 bg-gray-50">
-        <h3 className="font-semibold text-gray-900">AI Assistant</h3>
-        <p className="text-sm text-gray-500">
-          Ask questions about this document
-        </p>
+      <div className="px-4 h-14 flex items-center border-b border-gray-200 bg-gray-50">
+        <div>
+          <h3 className="font-semibold text-gray-900 leading-tight">
+            AI Assistant
+          </h3>
+          <p className="text-xs text-gray-500">
+            Ask questions about this document
+          </p>
+        </div>
       </div>
 
       {/* Messages */}
@@ -624,7 +553,11 @@ export function PDFChat({
         ) : null}
 
         {messages.map((message) => (
-          <MessageBubble key={message.id} isUser={message.isUser} text={message.text} />
+          <MessageBubble
+            key={message.id}
+            isUser={message.isUser}
+            text={message.text}
+          />
         ))}
 
         {isLoading && <TypingDots />}
@@ -675,14 +608,6 @@ export function PDFChat({
             )}
           </Button>
 
-          {/* Listening indicator for conversation mode */}
-          {/* {isConversationMode && isListening && (
-            <div className="flex items-center px-4 py-1 h-10 bg-green-100 rounded-lg">
-              <AudioWaveform className="h-4 w-4 text-green-500 animate-pulse" />
-            </div>
-          )} */}
-
-          {/* Speaking Indicator */}
           {isSpeaking && (
             <div className="flex items-center px-3 py-2 bg-blue-100 rounded-lg">
               <div className="flex space-x-1">

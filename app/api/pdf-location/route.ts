@@ -22,7 +22,7 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    console.log(`🔍 AI finding exact location for: "${aiMatchedPhrase}"`);
+    
 
     const result = await generateText({
       model: anthropic("claude-3-haiku-20240307"),
@@ -70,7 +70,7 @@ Text: NO_MATCH`,
     });
 
     const aiResponse = result.text.trim();
-    console.log(`🤖 AI location response: "${aiResponse}"`);
+    
 
     // Best-effort parse of AI response, but do not early-return on failure
     const pageMatch = aiResponse.match(/Page:\s*(\d+)/);
@@ -79,13 +79,13 @@ Text: NO_MATCH`,
     const hintedText = textMatch ? textMatch[1].trim() : null;
 
     if (hintedPage && hintedText && hintedText !== "NO_MATCH") {
-      console.log(`🔍 AI hints page ${hintedPage} with text: "${hintedText}"`);
+      
     } else {
-      console.log("ℹ️ AI location hint unavailable or unusable; falling back to deterministic search");
+      
     }
 
     // DIRECT APPROACH: Search for the exact text that the analysis API found
-    console.log(`🔎 Searching for exact text that analysis API found: "${aiMatchedPhrase}"`);
+    
 
     // Clean the AI matched phrase to get the actual PDF text (remove AI analysis wrapper)
     let cleanedPhrase = aiMatchedPhrase;
@@ -94,7 +94,7 @@ Text: NO_MATCH`,
     const quotedMatch = aiMatchedPhrase.match(/"([^"]+)"/);
     if (quotedMatch) {
       cleanedPhrase = quotedMatch[1];
-      console.log(`📝 Extracted quoted text: "${cleanedPhrase}"`);
+        
     }
 
     // Determine how many pages are in the provided text by scanning "Page N:" markers
@@ -146,7 +146,7 @@ Text: NO_MATCH`,
     for (let i = 1; i <= maxPage; i++) {
       const res = searchPage(i, cleanedPhrase);
       if (res) {
-        console.log(`✅ ${res.reason}: "${res.text}"`);
+        
         return NextResponse.json({
           pageNumber: res.pageNumber,
           actualText: res.text,
@@ -155,7 +155,7 @@ Text: NO_MATCH`,
       }
     }
 
-    console.log(`❌ Could not find the analyzed text in PDF`);
+    
     return NextResponse.json({
       pageNumber: null,
       actualText: null,

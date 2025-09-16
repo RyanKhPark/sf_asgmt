@@ -28,5 +28,5 @@ export function validateAuthConfig(): void {
     console.warn("⚠️  DATABASE_URL should start with 'postgresql://' for PostgreSQL");
   }
 
-  console.log("✅ Environment variables validated");
+  // Environment variables validated
 }

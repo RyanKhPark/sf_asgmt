@@ -1,36 +1,246 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# PDF Chat Application
 
-## Getting Started
+A modern PDF analysis and conversation platform that allows users to upload PDFs and interact with them through an AI-powered chat interface. Built with Next.js 14 and featuring voice conversation capabilities.
 
-First, run the development server:
+## 🚀 Features
 
-```bash
-npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
+### Core Functionality
+- **PDF Upload & Processing**: Drag-and-drop or file upload interface for PDF documents
+- **AI-Powered Chat**: Conversational interface to ask questions about uploaded PDFs
+- **Smart Text Extraction**: Automatic text extraction and processing from PDF documents
+- **Real-time Highlighting**: AI automatically highlights relevant sections while answering questions
+
+### Voice Features
+- **Voice Conversation Mode**: Toggle voice input/output for hands-free interaction
+- **Smart Speech Recognition**: Automatic sentence detection and submission
+- **Text-to-Speech**: AI responses are read aloud using browser's speech synthesis
+- **Real-time Transcription**: Live display of speech-to-text conversion
+
+### User Experience
+- **Authentication**: Secure user authentication with NextAuth.js (Google OAuth + email/password)
+- **Chat History**: Persistent conversation history for each document
+- **Document Management**: View and manage uploaded documents
+- **Responsive Design**: Mobile-friendly interface with modern UI components
+
+### Advanced Features
+- **PDF Annotation System**: Highlight and annotate PDF content
+- **Message-Highlight Linking**: Connect AI responses to specific PDF sections
+- **Multi-page Support**: Handle complex, multi-page documents
+- **Real-time Updates**: Live chat updates and status indicators
+
+## 🛠️ Tech Stack
+
+### Frontend
+- **Next.js 14** - React framework with App Router
+- **TypeScript** - Type-safe development
+- **Tailwind CSS** - Utility-first CSS framework
+- **Radix UI** - Accessible component primitives
+- **Lucide React** - Modern icon library
+- **Sonner** - Toast notifications
+
+### Backend & Database
+- **Next.js API Routes** - Server-side API endpoints
+- **Prisma** - Type-safe database ORM
+- **PostgreSQL** - Primary database
+- **Vercel Blob** - File storage solution
+
+### AI & Voice
+- **Anthropic Claude** - Primary AI model for PDF analysis
+- **Google Gemini** - Alternative AI model
+- **Web Speech API** - Browser-native speech recognition
+- **Browser Speech Synthesis** - Text-to-speech functionality
+
+### Authentication & Security
+- **NextAuth.js 5** - Authentication framework
+- **Google OAuth** - Social authentication
+- **bcrypt.js** - Password hashing
+- **Zod** - Runtime type validation
+
+### PDF Processing
+- **PDF.js** - Client-side PDF rendering and interaction
+- **pdf-parse** - Server-side PDF text extraction
+
+## 🚦 Getting Started
+
+### Prerequisites
+- Node.js 18+ and npm
+- PostgreSQL database
+- Google OAuth credentials (optional, for social login)
+- Anthropic API key for AI functionality
+
+### Installation
+
+1. **Clone the repository**
+   ```bash
+   git clone <repository-url>
+   cd studyfetch-assignment
+   ```
+
+2. **Install dependencies**
+   ```bash
+   npm install
+   ```
+
+3. **Set up environment variables**
+   ```bash
+   cp .env.example .env
+   ```
+
+   Fill in your environment variables:
+   ```env
+   # Database
+   DATABASE_URL="postgresql://username:password@localhost:5432/pdfchat_db"
+
+   # Authentication
+   NEXTAUTH_URL=http://localhost:3000
+   NEXTAUTH_SECRET=your-secret-key-here
+   GOOGLE_CLIENT_ID=your-google-client-id
+   GOOGLE_CLIENT_SECRET=your-google-client-secret
+
+   # AI Services
+   ANTHROPIC_API_KEY=your-anthropic-api-key
+   GEMINI_API_KEY=your-gemini-api-key
+
+   # File Storage
+   BLOB_READ_WRITE_TOKEN=your-vercel-blob-token
+   ```
+
+4. **Set up the database**
+   ```bash
+   npm run db:push
+   ```
+
+5. **Start the development server**
+   ```bash
+   npm run dev
+   ```
+
+6. **Open your browser**
+   Navigate to [http://localhost:3000](http://localhost:3000)
+
+## 📝 Available Scripts
+
+### Development
+- `npm run dev` - Start development server
+- `npm run build` - Build production application
+- `npm run start` - Start production server
+- `npm run lint` - Run ESLint
+
+### Database
+- `npm run db:generate` - Generate Prisma client
+- `npm run db:push` - Push schema changes to database
+- `npm run db:studio` - Open Prisma Studio
+- `npm run db:reset` - Reset database
+- `npm run db:seed` - Seed database with initial data
+
+## 🏗️ Project Structure
+
+```
+├── app/                    # Next.js App Router
+│   ├── (main)/            # Main application routes
+│   │   ├── page.tsx       # Home page (PDF upload)
+│   │   ├── history/       # Document history page
+│   │   └── pdfchat/       # PDF chat interface
+│   └── api/               # API routes
+│       ├── auth/          # Authentication endpoints
+│       ├── chat/          # Chat functionality
+│       ├── documents/     # Document management
+│       └── annotations/   # PDF annotation system
+├── components/            # Reusable React components
+│   ├── auth/             # Authentication components
+│   ├── chat/             # Chat-related components
+│   ├── pdf/              # PDF viewer and chat
+│   └── ui/               # Base UI components
+├── hooks/                # Custom React hooks
+├── lib/                  # Utility libraries
+├── prisma/               # Database schema and migrations
+├── providers/            # Context providers
+├── types/                # TypeScript type definitions
+└── services/             # External service integrations
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+## 🎯 Usage Guide
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+### Uploading a PDF
+1. Visit the home page
+2. Either drag-and-drop a PDF file or click "Upload" to select one
+3. Click "Let's Chat!" to process and open the document
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+### Voice Conversation
+1. In the chat interface, click the microphone button to enable voice mode
+2. Start speaking - the system will automatically detect when you finish
+3. AI responses will be read aloud automatically
+4. Click the microphone button again to disable voice mode
 
-## Learn More
+### PDF Interaction
+- Ask questions about the document content
+- View automatic highlights generated by AI responses
+- Navigate through different pages of the PDF
+- Access conversation history for each document
 
-To learn more about Next.js, take a look at the following resources:
+## 🔧 Configuration
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+### AI Models
+The application supports multiple AI providers:
+- **Anthropic Claude** (primary)
+- **Google Gemini** (fallback)
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+Configure API keys in your `.env` file to enable AI functionality.
 
-## Deploy on Vercel
+### Voice Features
+Voice functionality uses browser-native APIs:
+- **Speech Recognition**: Web Speech API
+- **Text-to-Speech**: Speech Synthesis API
 
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
+No additional configuration required - works in modern browsers.
 
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+### File Storage
+Uses Vercel Blob for file storage. Set up your `BLOB_READ_WRITE_TOKEN` in the environment variables.
+
+## 🚀 Deployment
+
+### Vercel (Recommended)
+1. Push to GitHub
+2. Connect repository to Vercel
+3. Configure environment variables in Vercel dashboard
+4. Deploy automatically
+
+### Manual Deployment
+1. Build the application: `npm run build`
+2. Set up PostgreSQL database
+3. Configure environment variables
+4. Run: `npm start`
+
+## 🤝 Contributing
+
+1. Fork the repository
+2. Create a feature branch: `git checkout -b feature-name`
+3. Commit changes: `git commit -m 'Add feature'`
+4. Push to branch: `git push origin feature-name`
+5. Submit a pull request
+
+## 📄 License
+
+This project is developed as part of a technical assignment.
+
+## 🆘 Troubleshooting
+
+### Common Issues
+
+**Voice mode not working**
+- Ensure you're using HTTPS or localhost
+- Check browser permissions for microphone access
+- Verify browser supports Web Speech API
+
+**PDF upload failing**
+- Check file size limits
+- Verify Vercel Blob configuration
+- Ensure proper file permissions
+
+**Database connection issues**
+- Verify PostgreSQL is running
+- Check DATABASE_URL format
+- Run `npm run db:push` to sync schema
+
+### Support
+For technical issues or questions, please refer to the project documentation or create an issue in the repository.

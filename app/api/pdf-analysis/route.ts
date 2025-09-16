@@ -21,7 +21,7 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    console.log(`🤖 AI analyzing answer to find essential topic in PDF...`);
+    
 
     const result = await generateText({
       model: anthropic("claude-3-haiku-20240307"),
@@ -90,7 +90,7 @@ Return only the EXACT PDF phrase (word-for-word as it appears in the PDF). Outpu
       });
     }
 
-    console.log(`✅ AI found relevant phrase: "${aiResponse}"`);
+    
 
     return NextResponse.json({
       matchedText: aiResponse,

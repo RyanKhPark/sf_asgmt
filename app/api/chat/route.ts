@@ -51,10 +51,7 @@ ${message}
 Respond directly to the student as a professor, in plain prose, without any role labels or fictional conversation.`;
     }
 
-    console.log("Sending to Anthropic:", {
-      documentId,
-      messageLength: message.length,
-    });
+    
 
     const result = await generateText({
       model: anthropic("claude-3-haiku-20240307"),

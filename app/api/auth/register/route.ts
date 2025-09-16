@@ -38,7 +38,7 @@ export async function POST(request: NextRequest): Promise<NextResponse<AuthRespo
       password,
     });
 
-    console.log("✅ User created successfully:", { id: user.id, email: user.email });
+    
 
     return NextResponse.json(
       {

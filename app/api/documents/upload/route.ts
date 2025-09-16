@@ -14,10 +14,7 @@ export async function POST(request: NextRequest) {
     // Check authentication
     const session = await auth();
     if (!session?.user?.id) {
-      return NextResponse.json(
-        { error: "Unauthorized" },
-        { status: 401 }
-      );
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
     // Parse form data
@@ -27,10 +24,7 @@ export async function POST(request: NextRequest) {
     const title = formData.get("title") as string;
 
     if (!file) {
-      return NextResponse.json(
-        { error: "No file provided" },
-        { status: 400 }
-      );
+      return NextResponse.json({ error: "No file provided" }, { status: 400 });
     }
 
     // Validate file type
@@ -53,7 +47,7 @@ export async function POST(request: NextRequest) {
     // Validate input
     const validation = uploadSchema.safeParse({
       filename: filename || file.name,
-      title: title || file.name.replace(/\.pdf$/i, ''),
+      title: title || file.name.replace(/\.pdf$/i, ""),
     });
 
     if (!validation.success) {
@@ -63,7 +57,8 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    const { filename: validatedFilename, title: validatedTitle } = validation.data;
+    const { filename: validatedFilename, title: validatedTitle } =
+      validation.data;
 
     // Generate unique filename
     const timestamp = Date.now();
@@ -73,8 +68,6 @@ export async function POST(request: NextRequest) {
     const blob = await put(uniqueFilename, file, {
       access: "public",
     });
-
-    console.log("📁 File uploaded to blob:", blob.url);
 
     // Save document metadata to database
     const document = await db.document.create({
@@ -88,8 +81,6 @@ export async function POST(request: NextRequest) {
       },
     });
 
-    console.log("✅ Document saved to database:", document.id);
-
     return NextResponse.json({
       success: true,
       document: {
@@ -102,29 +93,10 @@ export async function POST(request: NextRequest) {
         uploadedAt: document.uploadedAt,
       },
     });
-
   } catch (error) {
     console.error("Upload error:", error);
     return NextResponse.json(
       { error: "Internal server error" },
-      { status: 500 }
-    );
-  }
-}
-
-// Handle upload progress/callback
-export async function PUT(request: NextRequest) {
-  try {
-    const { url, pathname } = await request.json();
-
-    // You can update document status here if needed
-    console.log("Upload callback:", { url, pathname });
-
-    return NextResponse.json({ success: true });
-  } catch (error) {
-    console.error("Upload callback error:", error);
-    return NextResponse.json(
-      { error: "Callback failed" },
       { status: 500 }
     );
   }

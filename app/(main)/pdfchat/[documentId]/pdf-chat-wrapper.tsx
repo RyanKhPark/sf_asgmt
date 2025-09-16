@@ -1,23 +1,10 @@
 "use client";
 
 import { useState, useCallback } from "react";
-import { PDFViewerAdvanced } from "@/components/pdf/pdf-viewer-advanced";
+import { PDFViewerAdvanced } from "@/components/pdf/pdf-viewer";
 import { PDFChat } from "@/components/pdf/pdf-chat";
 import { toast } from "sonner";
-
-interface Highlight {
-  id: string;
-  pageNumber: number;
-  text: string;
-  rects: Array<{
-    x: number;
-    y: number;
-    width: number;
-    height: number;
-  }>;
-  color: string;
-  type: "manual" | "ai";
-}
+import type { Highlight } from "@/types/pdf";
 
 interface PDFChatWrapperProps {
   document: {
@@ -30,22 +17,13 @@ interface PDFChatWrapperProps {
 }
 
 export function PDFChatWrapper({ document }: PDFChatWrapperProps) {
-  const [selectedText, setSelectedText] = useState<string>("");
-  const [, setCurrentPage] = useState(1);
   const [aiHighlightPhrases, setAiHighlightPhrases] = useState<string[]>([]);
   const [, setManualHighlights] = useState<Highlight[]>([]);
   const [externalNotice, setExternalNotice] = useState<string | null>(null);
   const [activeMessageId, setActiveMessageId] = useState<string | null>(null);
 
-  const handleTextSelected = useCallback((text: string, pageNumber: number) => {
-    console.log(`Text selected on page ${pageNumber}: "${text}"`);
-    setSelectedText(text);
-    setCurrentPage(pageNumber);
-  }, []);
-
   const handleHighlightCreated = useCallback(
     async (highlight: Highlight) => {
-      console.log("New highlight created:", highlight);
       setManualHighlights((prev) => [...prev, highlight]);
 
       // Store highlight in database
@@ -55,7 +33,12 @@ export function PDFChatWrapper({ document }: PDFChatWrapperProps) {
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
             documentId: document.id,
-            type: highlight.type === "manual" ? "highlight" : "ai_highlight",
+            type:
+              highlight.shape === "circle"
+                ? "image_highlight"
+                : highlight.type === "manual"
+                ? "highlight"
+                : "ai_highlight",
             highlightText: highlight.text,
             pageNumber: highlight.pageNumber,
             x: highlight.rects[0]?.x || 0,
@@ -80,7 +63,6 @@ export function PDFChatWrapper({ document }: PDFChatWrapperProps) {
   );
 
   const handleAIHighlight = useCallback((phrases: string[]) => {
-    console.log("AI highlighting phrases:", phrases);
     setAiHighlightPhrases(phrases);
   }, []);
 
@@ -90,9 +72,7 @@ export function PDFChatWrapper({ document }: PDFChatWrapperProps) {
     setExternalNotice(message + " (This was checked against the current PDF.)");
   }, []);
 
-  const handleDocumentLoad = useCallback((numPages: number) => {
-    console.log(`Document loaded with ${numPages} pages`);
-  }, []);
+  const handleDocumentLoad = useCallback(() => {}, []);
 
   const handleError = useCallback((error: string) => {
     console.error("PDF Error:", error);
@@ -105,13 +85,8 @@ export function PDFChatWrapper({ document }: PDFChatWrapperProps) {
       <div className="fit-content border-r border-gray-300 overflow-hidden">
         <div className="h-full flex flex-col relative">
           {/* Header */}
-          <div className="px-4 py-2 border-b border-gray-200 bg-gray-50">
+          <div className="px-4 h-14 flex items-center justify-center border-b border-gray-200 bg-gray-50 ">
             <h2 className="font-semibold text-gray-900">{document.title}</h2>
-            <p className="text-sm text-gray-500">
-              {selectedText
-                ? `Selected: "${selectedText.substring(0, 50)}..."`
-                : "Select text to highlight"}
-            </p>
           </div>
 
           {/* PDF Viewer */}
@@ -119,7 +94,6 @@ export function PDFChatWrapper({ document }: PDFChatWrapperProps) {
             <PDFViewerAdvanced
               fileUrl={document.fileUrl}
               documentId={document.id}
-              onTextSelected={handleTextSelected}
               onHighlightCreated={handleHighlightCreated}
               aiHighlightPhrases={aiHighlightPhrases}
               activeMessageId={activeMessageId || undefined}
@@ -140,7 +114,9 @@ export function PDFChatWrapper({ document }: PDFChatWrapperProps) {
           pdfContent={document.extractedText || ""}
           onHighlightText={handleAIHighlight}
           externalNotice={externalNotice || undefined}
-          onAIMessageSaved={(messageId: string) => setActiveMessageId(messageId)}
+          onAIMessageSaved={(messageId: string) =>
+            setActiveMessageId(messageId)
+          }
         />
       </div>
     </div>

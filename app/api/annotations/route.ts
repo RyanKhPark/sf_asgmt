@@ -48,12 +48,7 @@ export async function POST(request: NextRequest) {
       },
     });
 
-    console.log(`💾 Saved ${type} annotation:`, {
-      id: annotation.id,
-      documentId,
-      pageNumber,
-      text: highlightText.substring(0, 50) + "...",
-    });
+    // Saved annotation
 
     // Optionally link to a message if provided and valid
     if (messageId) {
