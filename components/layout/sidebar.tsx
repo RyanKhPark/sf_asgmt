@@ -13,7 +13,11 @@ import { usePathname } from "next/navigation";
 import { useEffect, useState } from "react";
 import { useSession, signOut } from "next-auth/react";
 import { AuthModal } from "@/components/auth/auth-modal";
-import { sidebarTextAnimation, sidebarIconAnimation, sidebarAvatarAnimation } from "@/lib/sidebar-animations";
+import {
+  sidebarTextAnimation,
+  sidebarIconAnimation,
+  sidebarAvatarAnimation,
+} from "@/lib/sidebar-animations";
 
 const menuItems = [
   {
@@ -81,7 +85,10 @@ export default function HomeSidebar() {
           <div className="overflow-hidden">
             <Link href="/" className="flex items-center gap-2">
               <h1
-                className={sidebarTextAnimation(isCollapsed, "text-2xl font-semibold")}
+                className={sidebarTextAnimation(
+                  isCollapsed,
+                  "text-2xl font-semibold"
+                )}
               >
                 pdfChat
               </h1>
@@ -126,7 +133,10 @@ export default function HomeSidebar() {
                   />
                   <div className="overflow-hidden ml-3">
                     <span
-                      className={sidebarTextAnimation(isCollapsed, "text-sm font-medium")}
+                      className={sidebarTextAnimation(
+                        isCollapsed,
+                        "text-sm font-medium"
+                      )}
                     >
                       {item.label}
                     </span>
@@ -145,7 +155,10 @@ export default function HomeSidebar() {
                   />
                   <div className="overflow-hidden ml-3">
                     <span
-                      className={sidebarTextAnimation(isCollapsed, "text-sm font-medium")}
+                      className={sidebarTextAnimation(
+                        isCollapsed,
+                        "text-sm font-medium"
+                      )}
                     >
                       {item.label}
                     </span>
@@ -195,50 +208,74 @@ export default function HomeSidebar() {
           {session ? (
             <>
               <div
-                className={sidebarAvatarAnimation(isCollapsed, "w-8 h-8 border border-black rounded-full flex items-center justify-center text-black text-sm font-semibold")}
+                className={sidebarAvatarAnimation(
+                  isCollapsed,
+                  "w-8 h-8 border border-black rounded-full flex items-center justify-center text-black text-sm font-semibold"
+                )}
               >
                 {session.user?.name?.[0] || session.user?.email?.[0] || "U"}
               </div>
               <div className="overflow-hidden ml-3 flex flex-col items-start">
                 <div
-                  className={sidebarTextAnimation(isCollapsed, "text-sm font-medium")}
+                  className={sidebarTextAnimation(
+                    isCollapsed,
+                    "text-sm font-medium"
+                  )}
                 >
                   {session.user?.name || "User"}
                 </div>
                 <div
-                  className={sidebarTextAnimation(isCollapsed, "text-xs text-muted-foreground")}
+                  className={sidebarTextAnimation(
+                    isCollapsed,
+                    "text-xs text-muted-foreground"
+                  )}
                 >
                   {session.user?.email}
                 </div>
               </div>
               <div className="overflow-hidden ml-auto">
                 <ChevronRightIcon
-                  className={sidebarTextAnimation(isCollapsed, "size-4 flex-shrink-0")}
+                  className={sidebarTextAnimation(
+                    isCollapsed,
+                    "size-4 flex-shrink-0"
+                  )}
                 />
               </div>
             </>
           ) : (
             <>
               <div
-                className={sidebarAvatarAnimation(isCollapsed, "w-8 h-8 border border-black rounded-full flex items-center justify-center text-black text-sm")}
+                className={sidebarAvatarAnimation(
+                  isCollapsed,
+                  "w-8 h-8 border border-black rounded-full flex items-center justify-center text-black text-sm"
+                )}
               >
                 <LogIn className="size-4" />
               </div>
               <div className="overflow-hidden ml-3 flex flex-col items-start">
                 <div
-                  className={sidebarTextAnimation(isCollapsed, "text-sm font-medium")}
+                  className={sidebarTextAnimation(
+                    isCollapsed,
+                    "text-sm font-medium"
+                  )}
                 >
                   Sign In
                 </div>
                 <div
-                  className={sidebarTextAnimation(isCollapsed, "text-xs text-muted-foreground")}
+                  className={sidebarTextAnimation(
+                    isCollapsed,
+                    "text-xs text-muted-foreground"
+                  )}
                 >
                   Get started
                 </div>
               </div>
               <div className="overflow-hidden ml-auto">
                 <ChevronRightIcon
-                  className={sidebarTextAnimation(isCollapsed, "size-4 flex-shrink-0")}
+                  className={sidebarTextAnimation(
+                    isCollapsed,
+                    "size-4 flex-shrink-0"
+                  )}
                 />
               </div>
             </>
