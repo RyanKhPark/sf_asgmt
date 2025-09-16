@@ -7,7 +7,6 @@ A modern PDF analysis and conversation platform that allows users to upload PDFs
 ### Core Functionality
 - **PDF Upload & Processing**: Drag-and-drop or file upload interface for PDF documents
 - **AI-Powered Chat**: Conversational interface to ask questions about uploaded PDFs
-- **Smart Text Extraction**: Automatic text extraction and processing from PDF documents
 - **Real-time Highlighting**: AI automatically highlights relevant sections while answering questions
 
 ### Voice Features
@@ -20,13 +19,11 @@ A modern PDF analysis and conversation platform that allows users to upload PDFs
 - **Authentication**: Secure user authentication with NextAuth.js (Google OAuth + email/password)
 - **Chat History**: Persistent conversation history for each document
 - **Document Management**: View and manage uploaded documents
-- **Responsive Design**: Mobile-friendly interface with modern UI components
 
 ### Advanced Features
 - **PDF Annotation System**: Highlight and annotate PDF content
 - **Message-Highlight Linking**: Connect AI responses to specific PDF sections
 - **Multi-page Support**: Handle complex, multi-page documents
-- **Real-time Updates**: Live chat updates and status indicators
 
 ## 🛠️ Tech Stack
 
